@@ -1,0 +1,242 @@
+diff --git a/CMake/CurlTests.c b/CMake/CurlTests.c
+index bc36c8ef7..0eb034f94 100644
+--- a/CMake/CurlTests.c
++++ b/CMake/CurlTests.c
+@@ -510,11 +510,7 @@ main ()
+ int
+ main () {
+   char buffer[1024]; /* big enough to play with */
+-  char *string =
+-    strerror_r(EACCES, buffer, sizeof(buffer));
+-    /* this should've returned a string */
+-    if(!string || !string[0])
+-      return 99;
++  char c = (strerror_r(EACCES, buffer, sizeof(buffer)))[0];
+     return 0;
+ }
+ #endif
+diff --git a/CMake/Macros.cmake b/CMake/Macros.cmake
+index dab005f73..3d4e0bd78 100644
+--- a/CMake/Macros.cmake
++++ b/CMake/Macros.cmake
+@@ -68,7 +68,7 @@ macro(CURL_INTERNAL_TEST_RUN CURL_TEST)
+     endif(CMAKE_REQUIRED_LIBRARIES)
+ 
+     message(STATUS "Performing Curl Test ${CURL_TEST}")
+-    try_run(${CURL_TEST} ${CURL_TEST}_COMPILE
++    try_compile(${CURL_TEST} ${CURL_TEST}_COMPILE
+       ${CMAKE_BINARY_DIR}
+       ${CMAKE_CURRENT_SOURCE_DIR}/CMake/CurlTests.c
+       CMAKE_FLAGS -DCOMPILE_DEFINITIONS:STRING=${MACRO_CHECK_FUNCTION_DEFINITIONS}
+diff --git a/CMake/OtherTests.cmake b/CMake/OtherTests.cmake
+index 3b203c538..5bd6a61da 100644
+--- a/CMake/OtherTests.cmake
++++ b/CMake/OtherTests.cmake
+@@ -185,7 +185,7 @@ if(NOT APPLE)
+   if(HAVE_SYS_POLL_H)
+     set(CMAKE_REQUIRED_FLAGS "-DHAVE_SYS_POLL_H")
+   endif(HAVE_SYS_POLL_H)
+-  check_c_source_runs("
++  check_c_source_compiles("
+     #ifdef HAVE_SYS_POLL_H
+     #  include <sys/poll.h>
+     #endif
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 17606bf65..132032b85 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -332,6 +332,14 @@ if(CMAKE_USE_OPENSSL)
+   endif()
+ endif()
+ 
++if(USE_MBEDTLS)
++  if(CURL_WITH_MBEDTLS)
++    include_directories(${CURL_WITH_MBEDTLS}/include)
++    link_directories(${CURL_WITH_MBEDTLS}/lib)
++    link_libraries(mbedtls mbedx509 mbedcrypto)
++  endif(CURL_WITH_MBEDTLS)
++endif(USE_MBEDTLS)
++
+ option(USE_NGHTTP2 "Use Nghttp2 library" OFF)
+ if(USE_NGHTTP2)
+   find_package(NGHTTP2 REQUIRED)
+@@ -823,7 +831,7 @@ check_symbol_exists(setsockopt     "${CURL_INCLUDES}" HAVE_SETSOCKOPT)
+ # symbol exists in win32, but function does not.
+ check_function_exists(inet_pton HAVE_INET_PTON)
+ 
+-check_symbol_exists(fsetxattr "${CURL_INCLUDES}" HAVE_FSETXATTR)
++#check_symbol_exists(fsetxattr "${CURL_INCLUDES}" HAVE_FSETXATTR)
+ if(HAVE_FSETXATTR)
+   foreach(CURL_TEST HAVE_FSETXATTR_5 HAVE_FSETXATTR_6)
+     curl_internal_test_run(${CURL_TEST})
+@@ -899,9 +907,13 @@ foreach(CURL_TEST
+     HAVE_GLIBC_STRERROR_R
+     HAVE_POSIX_STRERROR_R
+     )
+-  curl_internal_test_run(${CURL_TEST})
++  curl_internal_test(${CURL_TEST})
+ endforeach(CURL_TEST)
+ 
++if(HAVE_GLIBC_STRERROR_R)
++  set(HAVE_POSIX_STRERROR_R "")
++endif(HAVE_GLIBC_STRERROR_R)
++
+ # Check for reentrant
+ foreach(CURL_TEST
+     HAVE_GETHOSTBYADDR_R_5
+diff --git a/include/curl/curl.h b/include/curl/curl.h
+index 467bb0240..1e42a61ea 100644
+--- a/include/curl/curl.h
++++ b/include/curl/curl.h
+@@ -1778,6 +1778,9 @@ typedef enum {
+   /* Path to an abstract Unix domain socket */
+   CINIT(ABSTRACT_UNIX_SOCKET, STRINGPOINT, 264),
+ 
++  /* Pointer to an array of tls certificates */
++  CINIT(CAARRAY, OBJECTPOINT, 265),
++
+   CURLOPT_LASTENTRY /* the last unused */
+ } CURLoption;
+ 
+diff --git a/include/curl/curlbuild.h.cmake b/include/curl/curlbuild.h.cmake
+index bbb31a940..41422156f 100644
+--- a/include/curl/curlbuild.h.cmake
++++ b/include/curl/curlbuild.h.cmake
+@@ -158,8 +158,22 @@
+ #  include <sys/poll.h>
+ #endif
+ 
++#ifdef __APPLE__
++
++/* On Apple (iOS) it is possible for curl to be compiled for two archs */
++/* at the same time, therefore we cannot define the size of types at */
++/* configure time, only at compile time. */
++
++#  ifdef __LP64__
++#    define CURL_SIZEOF_LONG 8
++#  else
++#    define CURL_SIZEOF_LONG 4
++#  endif
++
++#else
+ /* The size of `long', as computed by sizeof. */
+-#define CURL_SIZEOF_LONG ${CURL_SIZEOF_LONG}
++#  define CURL_SIZEOF_LONG ${CURL_SIZEOF_LONG}
++#endif
+ 
+ /* Integral data type used for curl_socklen_t. */
+ #define CURL_TYPEOF_CURL_SOCKLEN_T ${CURL_TYPEOF_CURL_SOCKLEN_T}
+diff --git a/lib/url.c b/lib/url.c
+index 38b9552f7..80f2dd8fd 100644
+--- a/lib/url.c
++++ b/lib/url.c
+@@ -572,6 +572,7 @@ CURLcode Curl_init_userdefined(struct UserDefined *set)
+   set->socks5_gssapi_nec = FALSE;
+ #endif
+ 
++  set->ca_array = ZERO_NULL;
+   /* This is our preferred CA cert bundle/path since install time */
+ #if defined(CURL_CA_BUNDLE)
+   result = setstropt(&set->str[STRING_SSL_CAFILE_ORIG], CURL_CA_BUNDLE);
+@@ -2206,6 +2207,9 @@ CURLcode Curl_setopt(struct Curl_easy *data, CURLoption option,
+     result = CURLE_NOT_BUILT_IN;
+ #endif
+     break;
++  case CURLOPT_CAARRAY:
++    data->set.ca_array = va_arg(param, void *);
++    break;
+   case CURLOPT_CAINFO:
+     /*
+      * Set CA info for SSL connection. Specify file name of the CA certificate
+@@ -6538,6 +6542,7 @@ static CURLcode create_conn(struct Curl_easy *data,
+      that will be freed as part of the Curl_easy struct, but all cloned
+      copies will be separately allocated.
+   */
++  data->set.ssl.primary.CAarray = data->set.ca_array;
+   data->set.ssl.primary.CApath = data->set.str[STRING_SSL_CAPATH_ORIG];
+   data->set.proxy_ssl.primary.CApath = data->set.str[STRING_SSL_CAPATH_PROXY];
+   data->set.ssl.primary.CAfile = data->set.str[STRING_SSL_CAFILE_ORIG];
+diff --git a/lib/urldata.h b/lib/urldata.h
+index 7f87913a9..87911b03a 100644
+--- a/lib/urldata.h
++++ b/lib/urldata.h
+@@ -353,6 +353,7 @@ struct ssl_primary_config {
+   bool verifypeer;       /* set TRUE if this is desired */
+   bool verifyhost;       /* set TRUE if CN/SAN must match hostname */
+   bool verifystatus;     /* set TRUE if certificate status must be checked */
++  const char **CAarray;  /* null-terminated array of certificates */
+   char *CApath;          /* certificate dir (doesn't work on windows) */
+   char *CAfile;          /* certificate to verify peer against */
+   char *clientcert;
+@@ -1665,6 +1666,7 @@ struct UserDefined {
+ 
+   curl_sshkeycallback ssh_keyfunc; /* key matching callback */
+   void *ssh_keyfunc_userp;         /* custom pointer to callback */
++  const char **ca_array;
+ 
+ /* Here follows boolean settings that define how to behave during
+    this session. They are STATIC, set by libcurl users or at least initially
+diff --git a/lib/vtls/mbedtls.c b/lib/vtls/mbedtls.c
+index 07239bf26..de138b47b 100644
+--- a/lib/vtls/mbedtls.c
++++ b/lib/vtls/mbedtls.c
+@@ -163,6 +163,7 @@ mbed_connect_step1(struct connectdata *conn,
+ {
+   struct Curl_easy *data = conn->data;
+   struct ssl_connect_data* connssl = &conn->ssl[sockindex];
++  const char ** const ssl_caarray = SSL_CONN_CONFIG(CAarray);
+   const char * const ssl_cafile = SSL_CONN_CONFIG(CAfile);
+   const bool verifypeer = SSL_CONN_CONFIG(verifypeer);
+   const char * const ssl_capath = SSL_CONN_CONFIG(CApath);
+@@ -172,6 +173,7 @@ mbed_connect_step1(struct connectdata *conn,
+     conn->host.name;
+   const long int port = SSL_IS_PROXY() ? conn->port : conn->remote_port;
+   int ret = -1;
++  int i;
+   char errorbuf[128];
+   errorbuf[0]=0;
+ 
+@@ -212,6 +214,23 @@ mbed_connect_step1(struct connectdata *conn,
+   /* Load the trusted CA */
+   mbedtls_x509_crt_init(&connssl->cacert);
+ 
++  if(ssl_caarray) {
++    for(i=0; ssl_caarray[i]; i++) {
++      ret = mbedtls_x509_crt_parse(&connssl->cacert, (const unsigned char*)ssl_caarray[i], strlen(ssl_caarray[i]) + 1);
++
++      if(ret<0) {
++#ifdef MBEDTLS_ERROR_C
++        mbedtls_strerror(ret, errorbuf, sizeof(errorbuf));
++#endif /* MBEDTLS_ERROR_C */
++        failf(data, "Error reading ca cert %s - mbedTLS: (-0x%04X) %s",
++              ssl_caarray[i], -ret, errorbuf);
++
++        if(verifypeer)
++          return CURLE_SSL_CACERT_BADFILE;
++      }
++    }
++  }
++
+   if(ssl_cafile) {
+     ret = mbedtls_x509_crt_parse_file(&connssl->cacert, ssl_cafile);
+ 
+diff --git a/lib/vtls/vtls.c b/lib/vtls/vtls.c
+index f40a97712..910951a55 100644
+--- a/lib/vtls/vtls.c
++++ b/lib/vtls/vtls.c
+@@ -97,6 +97,7 @@ Curl_ssl_config_matches(struct ssl_primary_config* data,
+   if((data->version == needle->version) &&
+      (data->verifypeer == needle->verifypeer) &&
+      (data->verifyhost == needle->verifyhost) &&
++     (data->CAarray == needle->CAarray) &&
+      Curl_safe_strcasecompare(data->CApath, needle->CApath) &&
+      Curl_safe_strcasecompare(data->CAfile, needle->CAfile) &&
+      Curl_safe_strcasecompare(data->clientcert, needle->clientcert) &&
+@@ -113,6 +114,7 @@ Curl_clone_primary_ssl_config(struct ssl_primary_config *source,
+   dest->verifyhost = source->verifyhost;
+   dest->verifypeer = source->verifypeer;
+   dest->version = source->version;
++  dest->CAarray = source->CAarray;
+ 
+   CLONE_STRING(CAfile);
+   CLONE_STRING(CApath);
