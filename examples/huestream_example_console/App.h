@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -31,12 +31,12 @@ typedef struct {
 
 class App {
 public:
-    App(const std::string &_name, const std::string &_platform);
+    App(const std::string &_appName, const std::string &_deviceName);
 
     void Main(int argc, char *argv[]);
 
-    std::string _name;
-    std::string _platform;
+    std::string _appName;
+    std::string _deviceName;
     TerminalCommand _command;
 
     void ExecuteConnectionModeAuto() const;

@@ -17,6 +17,7 @@ namespace huestream_tests
         protected String BRIDGE_ID = "001788fffe1ffd08";
         protected int TCP_PORT = 60202;
         protected String UDP_PORT = "60202";
+        protected String SSL_PORT = "61202";
         protected const int CONNECTION_TIMEOUT_MS = 3000;
 
         protected FeedbackMessageHandler _message_handler;
@@ -28,15 +29,11 @@ namespace huestream_tests
         {
             if (TestContext.Parameters.Count > 0)
             {
-                String addressWithPort = TestContext.Parameters["hue_bridge_ip"];
+                IPv4_ADDRESS = TestContext.Parameters["hue_ip"];
                 BRIDGE_ID = TestContext.Parameters["hue_bridge_id"];
                 UDP_PORT = TestContext.Parameters["hue_streaming_port"];
-
-                var addressAndPort = addressWithPort.Split(':');
-                Assert.IsTrue(addressAndPort.Count() == 2, "Incorrect ip and port combination");
-
-                IPv4_ADDRESS = addressAndPort[0];
-                TCP_PORT = int.Parse(addressAndPort[1]);
+                SSL_PORT = TestContext.Parameters["hue_https_port"];
+                TCP_PORT = int.Parse(TestContext.Parameters["hue_http_port"]);
             }
         }
 
@@ -52,7 +49,9 @@ namespace huestream_tests
             result.SetUser(GetUser());
             result.SetClientKey(GetClientKey());
             result.SetTcpPort(TCP_PORT.ToString());
-
+            result.SetSslPort(SSL_PORT);
+            result.EnableSsl();
+            
             return result;
         }
 

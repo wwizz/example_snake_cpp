@@ -50,12 +50,14 @@ public class ConnectivityTests extends BaseTest {
     }
 
     @Test
+    @Ignore // see HSDK-2273
     public void TestBridgeConnectivity_Connect_Valid() {
         _hue_stream.ConnectManualBridgeInfo(_bridge);
         checkStreamConnectionValid();
     }
 
     @Test
+    @Ignore // see HSDK-2273
     public void TestBridgeConnectivity_Connect_InvalidClientKey() {
         _bridge.SetClientKey("Invalid Client Key");
         _hue_stream.ConnectManualBridgeInfo(_bridge);
@@ -65,6 +67,7 @@ public class ConnectivityTests extends BaseTest {
     }
 
     @Test
+    @Ignore // see HSDK-2273
     public void TestBridgeConnectivity_Connect_Valid_Async() {
         FeedbackMessageObserver messageObserver = new FeedbackMessageObserver();
         _hue_stream.RegisterFeedbackHandler(messageObserver);

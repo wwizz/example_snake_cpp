@@ -12,9 +12,9 @@ namespace HueStreamExampleWPF
         private readonly Config _config;
         private HueStream _hueStream;
 
-        public Hue(string name, string platform)
+        public Hue(string appName, string deviceName)
         {
-            _config = new Config(name, platform);
+            _config = new Config(appName, deviceName);
         }
 
         ~Hue()

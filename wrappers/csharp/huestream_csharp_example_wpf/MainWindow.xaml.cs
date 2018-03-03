@@ -29,7 +29,7 @@ namespace Example_Effects_wpf_csharp
 
         private void Window_Initialized(object sender, EventArgs e)
         {
-            var hue = new Hue("huestream_csharp_example_wpf", "PC");
+            var hue = new Hue("HueExampleCSharp", "PC");
             var dc = (HueObservable) DataContext;
             dc.SetModel(hue, Dispatcher);
         }

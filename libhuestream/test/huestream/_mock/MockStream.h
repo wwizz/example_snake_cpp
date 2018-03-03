@@ -1,13 +1,16 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
 #ifndef LIBHUESTREAM_MOCKSTREAM_H
 #define LIBHUESTREAM_MOCKSTREAM_H
 
-#include "gtest/gtest.h"
-#include "gmock/gmock.h"
+#include <gtest/gtest.h>
+#include <gmock/gmock.h>
+
+#include <memory>
+
 #include "huestream/stream/IStream.h"
 
 MATCHER_P(MatchBridgeId, bridge, "Request did not match") { return arg->GetId() == bridge->GetId(); };
@@ -35,6 +38,55 @@ namespace huestream {
         MOCK_CONST_METHOD0(GetStreamCounter, int32_t());
 
         MOCK_METHOD1(UpdateBridgeGroup, void(BridgePtr bridge));
+    };
+
+    class MockWrapperStream : public IStream {
+    public:
+        explicit MockWrapperStream(const std::shared_ptr<MockStream>& mock)
+          : _mock(mock) {}
+
+        void ExecuteRenderCallback() {
+            _mock->ExecuteRenderCallback();
+        }
+
+        void SetRenderCallback(StreamRenderCallback callback) {
+            _mock->SetRenderCallback(callback);
+        }
+
+        bool Start(BridgePtr bridge) {
+            return _mock->Start(bridge);
+        }
+
+        bool StartWithRenderThread(BridgePtr bridge) {
+            return _mock->StartWithRenderThread(bridge);
+        }
+
+        void Stop() {
+            _mock->Stop();
+        }
+
+        void Stop(BridgePtr bridge) {
+            _mock->Stop(bridge);
+        }
+
+        bool IsStreaming() const {
+            return _mock->IsStreaming();
+        }
+
+        void RenderSingleFrame() {
+            _mock->RenderSingleFrame();
+        }
+
+        int32_t GetStreamCounter() const {
+            return _mock->GetStreamCounter();
+        }
+
+        void UpdateBridgeGroup(BridgePtr bridge) {
+            _mock->UpdateBridgeGroup(bridge);
+        }
+
+    private:
+        std::shared_ptr<MockStream> _mock;
     };
 }
 

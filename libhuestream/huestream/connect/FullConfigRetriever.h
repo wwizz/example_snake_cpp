@@ -1,19 +1,19 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
 #ifndef HUESTREAM_CONNECT_FULLCONFIGRETRIEVER_H_
 #define HUESTREAM_CONNECT_FULLCONFIGRETRIEVER_H_
 
-#include <huestream/connect/IFullConfigRetriever.h>
-#include <huestream/common/data/Bridge.h>
-#include <libjson/libjson.h>
-#include <huestream/common/http/IHttpClient.h>
-#include <network/http/HttpRequest.h>
-
 #include <memory>
 #include <string>
+
+#include "huestream/connect/IFullConfigRetriever.h"
+#include "huestream/common/data/Bridge.h"
+#include "libjson/libjson.h"
+#include "huestream/common/http/IHttpClient.h"
+#include "support/network/http/HttpRequest.h"
 
 
 namespace huestream {
@@ -25,24 +25,25 @@ namespace huestream {
         double _brightness = 0.0;
     };
 
-    class FullConfigRetriever : public IFullConfigRetriever {
+    class ConfigRetriever : public IConfigRetriever {
     public:
-        explicit FullConfigRetriever(const HttpClientPtr http, bool useForcedActivation = true);
+        explicit ConfigRetriever(const HttpClientPtr http, bool useForcedActivation = true, ConfigType configType = ConfigType::Full);
 
         bool Execute(BridgePtr bridge, RetrieveCallbackHandler cb) override;
 
     protected:
+        ConfigType _configType;
         HttpClientPtr _http;
         bool _useForcedActivation;
         std::mutex _mutex;
         bool _busy;
-        shared_ptr<huesdk_lib::HttpRequestBase> _request;
+        shared_ptr<support::HttpRequestBase> _request;
         std::string _response;
         BridgePtr _bridge;
         RetrieveCallbackHandler _cb;
         JSONNode _root;
 
-        void RetrieveFullConfig();
+        void RetrieveConfig();
 
         void ParseResponseAndExecuteCallback();
 
@@ -62,11 +63,15 @@ namespace huestream {
 
         void ParseLightsAndLocations(const JSONNode &node, GroupPtr group) const;
 
+        void ParseStream(const JSONNode &node, GroupPtr group);
+
         void ParseStreamActive(const JSONNode &node, GroupPtr group);
+
+        void ParseStreamProxy(const JSONNode &node, GroupPtr group);
 
         void ParseGroupState(const JSONNode &node, GroupPtr group);
 
-        std::string GetFriendlyName(const std::string &userName);
+        std::string GetOwnerName(const std::string &userName);
 
         LightInfo GetLightInfo(const std::string &id) const;
 
@@ -80,6 +85,8 @@ namespace huestream {
 
         void Finish(OperationResult result);
     };
+
+    using FullConfigRetriever = ConfigRetriever;
 }  // namespace huestream
 
 #endif  // HUESTREAM_CONNECT_FULLCONFIGRETRIEVER_H_

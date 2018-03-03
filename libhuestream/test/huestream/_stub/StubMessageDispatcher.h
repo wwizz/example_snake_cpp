@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -14,20 +14,45 @@ using huestream::IMessageDispatcher;
 
 
 class StubMessageDispatcher : public IMessageDispatcher {
-public:
-    StubMessageDispatcher();
+ public:
+  StubMessageDispatcher():
+      _queue(), _isProcessingQueue(false) {
+  }
 
-    virtual void Execute(bool useThisTread) override;
+  void Execute(bool useThisTread) override {
 
-    virtual void Stop() override;
+  }
 
-    vector<DispatchAction> _queue;
+  void Stop() override {
 
-    virtual void Queue(DispatchAction action) override;
+  }
 
-    void ExecutePendingActions();
+  vector<DispatchAction> _queue;
 
-    bool _isProcessingQueue;
+  void Queue(DispatchAction action) override {
+    _queue.insert(_queue.begin(), action);
+  }
+
+  void ExecuteOnePendingAction() {
+    if (!_queue.empty()) {
+      _isProcessingQueue = true;
+      auto action = _queue.back();
+      _queue.pop_back();
+      action();
+    }
+    _isProcessingQueue = false;
+  }
+    void ExecutePendingActions(){
+    while (!_queue.empty()) {
+      _isProcessingQueue = true;
+      auto action = _queue.back();
+      _queue.pop_back();
+      action();
+    }
+    _isProcessingQueue = false;
+  }
+
+  bool _isProcessingQueue;
 };
 
 

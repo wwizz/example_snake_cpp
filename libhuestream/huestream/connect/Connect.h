@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 /** @file */
@@ -43,6 +43,8 @@ namespace huestream {
 
     class IConnect {
      public:
+        virtual ~IConnect() = default;
+
         virtual void Load() = 0;
 
         virtual void ConnectToBridge() = 0;

@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -25,14 +25,14 @@ namespace huestream {
             Disconnect();
         }
 
-        _socketUdp = std::make_shared<huesdk_lib::SocketUdp>(huesdk_lib::SocketAddress("0.0.0.0", 0));
+        _socketUdp = std::make_shared<support::SocketUdp>(support::SocketAddress("0.0.0.0", 0));
 
         _peerAddress.set_ip(RemovePortFromIp(bridge->GetIpAddress()));
         _peerAddress.set_port(port);
 
-        if (_socketUdp->bind() != huesdk_lib::SOCKET_STATUS_OK)
+        if (_socketUdp->bind() != support::SOCKET_STATUS_OK)
             return false;
-        if (_socketUdp->connect_sync(_peerAddress) != huesdk_lib::SOCKET_STATUS_OK)
+        if (_socketUdp->connect_sync(_peerAddress) != support::SOCKET_STATUS_OK)
             return false;
 
         _connectionState = ConnectionState::Connected;
@@ -43,7 +43,7 @@ namespace huestream {
         if (_connectionState != ConnectionState::Connected)
             return false;
 
-        return _socketUdp->sync_send((unsigned char *) buffer, bufferSize) != huesdk_lib::SOCKET_STATUS_OK;
+        return _socketUdp->sync_send((unsigned char *) buffer, bufferSize) != support::SOCKET_STATUS_OK;
     }
 
     void UdpConnector::Disconnect() {

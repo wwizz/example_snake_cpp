@@ -25,3 +25,23 @@ function(linker_no_deduplicate TARGET)
         set_target_properties(${TARGET} PROPERTIES LINK_FLAGS "${CURRENT_LINK_FLAGS} -Xlinker -no_deduplicate")
     endif(APPLE)
 endfunction()
+
+
+function(add_test_library PROJECT_NAME SOURCES)
+    if(MSVC)
+        set_source_files_properties(${SOURCES} PROPERTIES COMPILE_FLAGS /bigobj)
+    elseif(WIN32 AND "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+        set_source_files_properties(${SOURCES} PROPERTIES COMPILE_FLAGS "-Wno-inconsistent-missing-override -Os")
+    else(MSVC)
+        set_source_files_properties(${SOURCES} PROPERTIES COMPILE_FLAGS -Wno-inconsistent-missing-override)
+    endif(MSVC)
+
+    if(ANDROID)
+        add_library(${PROJECT_NAME} SHARED ${SOURCES} "$<TARGET_PROPERTY:testrunner,SOURCE_DIR>/JNITestRunner.cpp")
+    else(OTHER)
+        add_executable(${PROJECT_NAME} ${SOURCES})
+    endif()
+
+    linker_no_deduplicate(${PROJECT_NAME})
+    treat_warning_as_error(${PROJECT_NAME})
+endfunction()

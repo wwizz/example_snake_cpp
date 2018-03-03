@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -11,11 +11,10 @@ using std::vector;
 using huesdk::BridgeDiscoveryReturnCode;
 using huesdk::BridgeDiscoveryResult;
 using huesdk::BridgeDiscovery;
-using huesdk::BridgeDiscoveryOption;
 
 namespace huestream {
 
-        void BridgeSearcher::operator()(const vector<BridgeDiscoveryResult> &results,
+        void BridgeSearcher::operator()(const vector<std::shared_ptr<BridgeDiscoveryResult>> &results,
                                                BridgeDiscoveryReturnCode return_code) {
             if (!_searcher)
                 return;
@@ -24,11 +23,11 @@ namespace huestream {
             if (return_code == BridgeDiscoveryReturnCode::BRIDGE_DISCOVERY_RETURN_CODE_SUCCESS) {
                 for (auto result : results) {
                     auto bridge = std::make_shared<Bridge>(_bridgeSettings);
-                    bridge->SetId(result.get_unique_id());
-                    bridge->SetIpAddress(result.get_ip());
+                    bridge->SetId(result->get_unique_id());
+                    bridge->SetIpAddress(result->get_ip());
                     bridge->SetIsValidIp(true);
-                    bridge->SetApiversion(result.get_api_version());
-                    bridge->SetModelId(result.get_model_id());
+                    bridge->SetApiversion(result->get_api_version());
+                    bridge->SetModelId(result->get_model_id());
                     bridges->push_back(bridge);
                 }
             }
@@ -45,9 +44,9 @@ namespace huestream {
             _cb = cb;
             _searcher = std::make_shared<BridgeDiscovery>();
             if (bruteForce) {
-                _searcher->search(BridgeDiscoveryOption::DISCOVERY_OPTION_UPNP |
-                                  BridgeDiscoveryOption::DISCOVERY_OPTION_NUPNP |
-                                  BridgeDiscoveryOption::DISCOVERY_OPTION_IPSCAN, this);
+                _searcher->search(BridgeDiscovery::Option::UPNP |
+                                  BridgeDiscovery::Option::NUPNP |
+                                  BridgeDiscovery::Option::IPSCAN, this);
             } else {
                 _searcher->search(this);
             }

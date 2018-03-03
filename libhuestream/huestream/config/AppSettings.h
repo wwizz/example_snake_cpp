@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 /** @file */
@@ -15,6 +15,12 @@
 
 namespace huestream {
 
+    typedef enum {
+        ACTIVATION_OVERRIDELEVEL_NEVER = 0x00,
+        ACTIVATION_OVERRIDELEVEL_SAMEGROUP = 0x01,
+        ACTIVATION_OVERRIDELEVEL_ALWAYS = 0x02
+    } ActivationOverrideLevel;
+
     /**
      various application configuration settings for the library
      */
@@ -24,11 +30,15 @@ namespace huestream {
 
         AppSettings();
 
+        bool UseForcedActivation();
+
     /**
-     set whether forced stream activation is used which means the library will override another application already streaming to the same entertainment group
-     @note default true, should be false for non content specific applications to give content specific applications priority
+     set which stream activation override level is used which means the library will override another application already streaming
+     @note default SAMEGROUP: only override if other app is streaming to same group
+     @note should be NEVER for non content specific applications to give content specific applications priority
+     @note should only be ALWAYS if the application has a built in warning that action will override session in other room
      */
-    PROP_DEFINE_BOOL(AppSettings, bool, useForcedActivation, UseForcedActivation);
+    PROP_DEFINE(AppSettings, ActivationOverrideLevel, activationOverride, ActivationOverride);
 
     /**
      set whether the library will automatically start streaming (controlling the lights) right after the bridge has been connected to
@@ -46,13 +56,13 @@ namespace huestream {
      set a user friendly name of the application
      @note no default, this is mandatory to set
      */
-    PROP_DEFINE(AppSettings, std::string, name, Name);
+    PROP_DEFINE(AppSettings, std::string, appName, AppName);
 
     /**
      set a user friendly name of the platfrom this application is running on
      @note no default, this is mandatory to set
      */
-    PROP_DEFINE(AppSettings, std::string, platform, Platform);
+    PROP_DEFINE(AppSettings, std::string, deviceName, DeviceName);
 
     /**
      set the ISO 639-1 language code used by the library to output user messages in the correct language
@@ -83,7 +93,6 @@ namespace huestream {
      @note default 15000 (15 seconds)
      */
     PROP_DEFINE(AppSettings, int, monitorIntervalNotStreamingMs, MonitorIntervalNotStreamingMs);
-
     };
 
     /**

@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -12,7 +12,6 @@
 #include <vector>
 #include <memory>
 #include <iostream>
-#include <memory>
 #include <type_traits>
 
 namespace huestream {
@@ -31,6 +30,19 @@ typedef std::shared_ptr<type> type##Ptr; \
 typedef std::vector<type##Ptr> type##List; \
 typedef std::shared_ptr<type##List> type##ListPtr;
 
+#define PROP_DEFINE_VIRTUAL(className, type, privateName, publicName) \
+public: \
+  virtual const type &Get##publicName() const = 0; \
+  virtual void Set##publicName(const type &privateName) = 0;
+
+#define PROP_DEFINE_OVERRIDE(className, type, privateName, publicName) \
+public: \
+  static HUESTREAM_EXPORT std::string Attribute##publicName;\
+  const type &Get##publicName() const override; \
+  void Set##publicName(const type &privateName) override; \
+protected: \
+  type _##privateName;
+
 template<class T>
 std::shared_ptr<std::vector<std::shared_ptr<T>>> clone_list(std::shared_ptr<std::vector<std::shared_ptr<T>>> input) {
     auto output = std::make_shared<std::vector<std::shared_ptr<T>>>();
@@ -48,10 +60,85 @@ public: \
 protected: \
   type _##privateName;
 
+
+#define PROP_DEFINE_GET(className, type, privateName, publicName) \
+public: \
+  static HUESTREAM_EXPORT std::string Attribute##publicName;\
+  const type &Get##publicName() const; \
+protected: \
+  type _##privateName;
+
+#define PROP_GET(type, privateName, publicName) \
+public: \
+  static HUESTREAM_EXPORT std::string Attribute##publicName;\
+  const type &Get##publicName() const{\
+    return _##privateName;\
+  } \
+protected: \
+  type _##privateName;
+
+#define PROP_SET(type, privateName, publicName) \
+public: \
+  static HUESTREAM_EXPORT std::string Attribute##publicName;\
+  void Set##publicName(const type &privateName) {\
+    _##privateName = privateName;\
+  } \
+protected: \
+  type _##privateName;
+
+#define PROP_GETSET(type, privateName, publicName) \
+public: \
+  static HUESTREAM_EXPORT std::string Attribute##publicName;\
+  const type &Get##publicName() const{\
+    return _##privateName;\
+  } \
+  void Set##publicName(const type &privateName) {\
+    _##privateName = privateName;\
+  } \
+protected: \
+  type _##privateName;
+
+#define PROP_GETSET_MODIFIED(type, privateName, publicName, modified) \
+public: \
+  static HUESTREAM_EXPORT std::string Attribute##publicName;\
+  const type &Get##publicName() const{\
+    return _##privateName;\
+  } \
+  void Set##publicName(const type &privateName) {\
+    _##privateName = privateName;\
+    modified = true;\
+  } \
+protected: \
+  type _##privateName;
+
+#define PROP_DEFINE_IMPL(className, type, privateName, publicName) PROP_GETSET(type, privateName, publicName)
+
+#define PROP_DEFINE_IMPL_GET(className, type, privateName, publicName) \
+public: \
+  static HUESTREAM_EXPORT std::string Attribute##publicName;\
+  const type &Get##publicName() const { return _##privateName;} \
+protected: \
+  type _##privateName;
+
+
+#define PROP_DEFINE_IMPL_ON_UPDATE_CALL(className, type, privateName, publicName, updateCallName) \
+public: \
+  static HUESTREAM_EXPORT std::string Attribute##publicName;\
+  const type &Get##publicName() const { return _##privateName;} \
+  void Set##publicName(const type &privateName) { _##privateName = privateName; updateCallName();} \
+protected: \
+  type _##privateName;
+
 #define PROP_IMPL(className, type, privateName, publicName) \
   std::string className::Attribute##publicName = ""#publicName""; \
   const type &className::Get##publicName() const { return _##privateName;} \
   void className::Set##publicName(const type &privateName) { _##privateName = privateName;}
+
+#define PROP_IMPL_GET(className, type, privateName, publicName) \
+  std::string className::Attribute##publicName = ""#publicName""; \
+  const type &className::Get##publicName() const { return _##privateName;}
+
+
 
 #define PROP_IMPL_ON_UPDATE_CALL(className, type, privateName, publicName, updateCallName) \
   std::string className::Attribute##publicName = ""#publicName""; \

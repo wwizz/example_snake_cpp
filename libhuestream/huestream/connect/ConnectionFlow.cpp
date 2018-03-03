@@ -1,9 +1,10 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
 #include <huestream/connect/ConnectionFlow.h>
+#include <huestream/connect/BridgeStreamingChecker.h>
 #include <huestream/config/Config.h>
 
 #include <algorithm>
@@ -21,6 +22,9 @@ namespace huestream {
 #define DISPATCH_P2(method, value1, value2) \
   MESSAGE_DISPATCH_P2(_factory->GetMessageDispatcher(), ConnectionFlow::method, value1, value2);
 
+#define DISPATCH_P3(method, value1, value2, value3) \
+  MESSAGE_DISPATCH_P3(_factory->GetMessageDispatcher(), ConnectionFlow::method, value1, value2, value3);
+
 ConnectionFlow::ConnectionFlow(ConnectionFlowFactoryPtr factory, StreamPtr stream, BridgeSettingsPtr bridgeSettings, AppSettingsPtr appSettings, BridgeStorageAccessorPtr storageAccessor) :
     _appSettings(appSettings),
     _bridgeSettings(bridgeSettings),
@@ -30,7 +34,8 @@ ConnectionFlow::ConnectionFlow(ConnectionFlowFactoryPtr factory, StreamPtr strea
     _ongoingAuthenticationCount(0),
     _backgroundDiscoveredBridges(std::make_shared<BridgeList>()),
     _stream(stream),
-    _persistentData(std::make_shared<HueStreamData>(bridgeSettings)) {
+    _persistentData(std::make_shared<HueStreamData>(bridgeSettings)),
+    _bridgeStartState(std::make_shared<Bridge>(bridgeSettings)) {
     _factory = factory;
     _persistentData->Clear();
     _backgroundDiscoveredBridges->clear();
@@ -47,7 +52,9 @@ void ConnectionFlow::DoLoad() {
     if (!Start(FeedbackMessage::REQUEST_TYPE_LOAD_BRIDGE))
         return;
 
-    StartLoading();
+    StartLoading([this](){
+        Finish();
+    });
 }
 
 void ConnectionFlow::ConnectToBridge() {
@@ -64,7 +71,14 @@ void ConnectionFlow::DoConnectToBridge() {
         _backgroundDiscoveredBridges->clear();
         StartAuthentication(bridges);
     } else {
-        StartLoading();
+        StartLoading([this](){
+            if (_persistentData->GetActiveBridge()->IsEmpty()) {
+                StartBridgeSearch();
+            }
+            else {
+                StartRetrieveSmallConfig(_persistentData->GetActiveBridge());
+            }
+        });
     }
 }
 
@@ -76,7 +90,14 @@ void ConnectionFlow::DoConnectToBridgeBackground() {
     if (!Start(FeedbackMessage::REQUEST_TYPE_CONNECT_BACKGROUND))
         return;
 
-    StartLoading();
+    StartLoading([this](){
+        if (_persistentData->GetActiveBridge()->IsEmpty()) {
+            StartBridgeSearch();
+        }
+        else {
+            StartRetrieveSmallConfig(_persistentData->GetActiveBridge());
+        }
+    });
 }
 
 void ConnectionFlow::ConnectToBridgeWithIp(const std::string &ipAddress) {
@@ -91,7 +112,9 @@ void ConnectionFlow::DoConnectToBridgeWithIp(const std::string &ipAddress) {
     bridge->SetIpAddress(ipAddress);
     bridge->SetIsValidIp(true);
 
-    StartAuthentication(bridge);
+    StartLoading([this, bridge](){
+        StartRetrieveSmallConfig(bridge);
+    });
 }
 
 void ConnectionFlow::ConnectToNewBridge() {
@@ -104,12 +127,13 @@ void ConnectionFlow::DoConnectToNewBridge() {
 
     if (_persistentData->GetActiveBridge()->IsStreaming()) {
         _stream->Stop(_persistentData->GetActiveBridge());
-        NewMessage(FeedbackMessage(_request, FeedbackMessage::ID_STREAMING_DISCONNECTED, _persistentData->GetActiveBridge()));
     }
 
-    SetNewActiveBridge(std::make_shared<Bridge>(_bridgeSettings));
+    _persistentData->SetActiveBridge(std::make_shared<Bridge>(_bridgeSettings));
 
-    StartBridgeSearch();
+    StartLoading([this]() {
+        StartBridgeSearch();
+    });
 }
 
 void ConnectionFlow::SetManual(BridgePtr bridge) {
@@ -122,14 +146,14 @@ void ConnectionFlow::DoSetManual(BridgePtr bridge) {
 
     if (_persistentData->GetActiveBridge()->IsStreaming()) {
         _stream->Stop(_persistentData->GetActiveBridge());
-        NewMessage(FeedbackMessage(_request, FeedbackMessage::ID_STREAMING_DISCONNECTED, _persistentData->GetActiveBridge()));
     }
 
     bridge->SetIsValidIp(true);
     bridge->SetIsAuthorized(true);
-    SetNewActiveBridge(bridge);
 
-    StartRetrieveFullConfig();
+    StartLoading([this, bridge](){
+        StartRetrieveSmallConfig(bridge);
+    });
 }
 
 void ConnectionFlow::ResetBridge() {
@@ -149,7 +173,6 @@ void ConnectionFlow::DoReset(bool onlyActiveBridge) {
 
     if (_persistentData->GetActiveBridge()->IsStreaming()) {
         _stream->Stop(_persistentData->GetActiveBridge());
-        NewMessage(FeedbackMessage(_request, FeedbackMessage::ID_STREAMING_DISCONNECTED, _persistentData->GetActiveBridge()));
     }
 
     ClearBridge();
@@ -163,11 +186,16 @@ void ConnectionFlow::DoSelectGroup(std::string id) {
     if (!Start(FeedbackMessage::REQUEST_TYPE_SELECT))
         return;
 
-    if (!_persistentData->GetActiveBridge()->SelectGroup(id)) {
+    auto selected = _persistentData->GetActiveBridge()->SelectGroup(id);
+    if (!_persistentData->GetActiveBridge()->IsValidGroupSelected()) {
         ReportActionRequired();
     }
 
-    StartSaving();
+    if (selected) {
+        StartSaving();
+    } else {
+        Finish();
+    }
 }
 
 void ConnectionFlow::StartStream(StreamPtr stream) {
@@ -216,6 +244,7 @@ void ConnectionFlow::DoAbort() {
         _ongoingAuthenticationCount = 0;
     }
 
+    _persistentData->SetActiveBridge(_bridgeStartState);
     NewMessage(FeedbackMessage(_request, FeedbackMessage::ID_DONE_ABORTED, _persistentData->GetActiveBridge()));
     Finish();
 }
@@ -231,10 +260,12 @@ void ConnectionFlow::DoOnBridgeMonitorEvent(const FeedbackMessage & message) {
     _persistentData->SetActiveBridge(message.GetBridge());
 
     if (message.GetId() == FeedbackMessage::ID_STREAMING_DISCONNECTED) {
-        DeactivateStreaming();
-    } else {
-        NewMessage(message);
+        _stream->Stop(_persistentData->GetActiveBridge());
     }
+    
+    NewMessage(message);
+
+    Finish();
 }
 
 bool ConnectionFlow::Start(FeedbackMessage::RequestType request) {
@@ -243,8 +274,10 @@ bool ConnectionFlow::Start(FeedbackMessage::RequestType request) {
 
     _request = request;
 
-    if (request != FeedbackMessage::REQUEST_TYPE_INTERNAL)
+    if (request != FeedbackMessage::REQUEST_TYPE_INTERNAL) {
         NewMessage(FeedbackMessage(_request, FeedbackMessage::ID_USERPROCEDURE_STARTED, _persistentData->GetActiveBridge()));
+        _bridgeStartState = _persistentData->GetActiveBridge()->Clone();
+    }
 
     return true;
 }
@@ -253,37 +286,28 @@ void ConnectionFlow::NewMessage(const FeedbackMessage& message) {
     _feedbackMessageCallback(message);
 }
 
-void ConnectionFlow::StartLoading() {
+void ConnectionFlow::StartLoading(std::function<void()> callback) {
     NewMessage(FeedbackMessage(_request, FeedbackMessage::ID_START_LOADING, _persistentData->GetActiveBridge()));
     _state = Loading;
-    _storageAccessor->Load([this](OperationResult r, HueStreamDataPtr data) {
-        DISPATCH_P2(LoadingCompleted, r, data);
+    _storageAccessor->Load([this, callback](OperationResult r, HueStreamDataPtr data) {
+        DISPATCH_P3(LoadingCompleted, r, data, callback);
     });
 }
 
-void ConnectionFlow::LoadingCompleted(OperationResult result, HueStreamDataPtr persistentData) {
+void ConnectionFlow::LoadingCompleted(OperationResult result, HueStreamDataPtr persistentData, std::function<void()> callback) {
     if (_state != Loading)
         return;
 
     _persistentData = persistentData;
 
     if (result == OPERATION_SUCCESS) {
-        NewMessage(FeedbackMessage(_request, FeedbackMessage::ID_FINISH_LOADING_BRIDGE_CONFIGURED, _persistentData->GetActiveBridge(), persistentData->GetBridges()));
+        NewMessage(FeedbackMessage(_request, FeedbackMessage::ID_FINISH_LOADING_BRIDGE_CONFIGURED, _persistentData->GetActiveBridge(), persistentData->GetAllKnownBridges()));
     } else {
-        NewMessage(FeedbackMessage(_request, FeedbackMessage::ID_FINISH_LOADING_NO_BRIDGE_CONFIGURED, _persistentData->GetActiveBridge(), persistentData->GetBridges()));
+        NewMessage(FeedbackMessage(_request, FeedbackMessage::ID_FINISH_LOADING_NO_BRIDGE_CONFIGURED, _persistentData->GetActiveBridge()));
         _persistentData->GetActiveBridge()->Clear();
     }
 
-    if (_request == FeedbackMessage::REQUEST_TYPE_LOAD_BRIDGE) {
-        Finish();
-        return;
-    }
-
-    if (_persistentData->GetActiveBridge()->HasEverBeenAuthorizedForStreaming()) {
-        StartRetrieveFullConfig();
-    } else {
-        StartBridgeSearch();
-    }
+    callback();
 }
 
 
@@ -330,6 +354,8 @@ void ConnectionFlow::BridgeSearchCompleted(BridgeListPtr bridges) {
 
     if (ContainsValidBridge(bridges)) {
         NewMessage(FeedbackMessage(_request, FeedbackMessage::ID_FINISH_SEARCH_BRIDGES_FOUND, _persistentData->GetActiveBridge(), bridges));
+
+        EvaluateBridgesSecurity(*bridges);
 
         if (_request != FeedbackMessage::REQUEST_TYPE_CONNECT_NEW && _persistentData->RediscoverKnownBridge(bridges)) {
             StartRetrieveFullConfig();
@@ -413,7 +439,7 @@ void ConnectionFlow::AuthenticationCompleted(BridgePtr bridge) {
     if (bridge->IsAuthorized()) {
         _ongoingAuthenticationCount--;
         _persistentData->SetActiveBridge(bridge);
-        NewMessage(FeedbackMessage(_request, FeedbackMessage::ID_FINISH_AUTHORIZING_AUTHORIZED, _persistentData->GetActiveBridge()));
+        NewMessage(FeedbackMessage(_request, FeedbackMessage::ID_FINISH_AUTHORIZING_AUTHORIZED, _persistentData->GetActiveBridge(), _persistentData->GetAllKnownBridges()));
         StartRetrieveFullConfig();
     } else {
         PushLinkBridge(bridge);
@@ -426,12 +452,53 @@ void ConnectionFlow::PushLinkBridge(BridgePtr bridge) {
     });
 }
 
+void ConnectionFlow::StartRetrieveSmallConfig(BridgePtr bridge) {
+    _state = Retrieving;
+
+    NewMessage(FeedbackMessage(_request, FeedbackMessage::ID_START_RETRIEVING_SMALL, _persistentData->GetActiveBridge()));
+
+    _smallConfigRetriever = _factory->CreateConfigRetriever(_appSettings->UseForcedActivation(), ConfigType::Small);
+    _smallConfigRetriever->Execute(bridge, [this, bridge](OperationResult result, BridgePtr configured_bridge) {
+        bridge->SetId(configured_bridge->GetId());
+        bridge->SetModelId(configured_bridge->GetModelId());
+        bridge->SetApiversion(configured_bridge->GetApiversion());
+        DISPATCH_P2(RetrieveSmallConfigCompleted, result, bridge);
+    });
+}
+
+void ConnectionFlow::RetrieveSmallConfigCompleted(OperationResult result, BridgePtr bridge) {
+    if (_state != Retrieving)
+        return;
+
+    if (result == OPERATION_FAILED) {
+        RetrieveFailed(bridge);
+    } else {
+        NewMessage(FeedbackMessage(_request, FeedbackMessage::ID_FINISH_RETRIEVING_SMALL, bridge));
+
+        EvaluateBridgesSecurity({bridge});
+        _persistentData->SetActiveBridge(bridge);
+
+        if (!bridge->IsValidModelId()) {
+            StartBridgeSearch();
+            return;
+        }
+
+        if (bridge->IsAuthorized() || bridge->HasEverBeenAuthorizedForStreaming()) {
+            StartRetrieveFullConfig();
+        }
+        else {
+            StartAuthentication(bridge);
+        }
+    }
+}
 
 void ConnectionFlow::StartRetrieveFullConfig() {
-    NewMessage(FeedbackMessage(_request, FeedbackMessage::ID_START_RETRIEVING, _persistentData->GetActiveBridge()));
     _state = Retrieving;
-    _fullconfigRetriever = _factory->CreateFullConfigRetriever(_appSettings->UseForcedActivation());
-    _fullconfigRetriever->Execute(_persistentData->GetActiveBridge(), [this](OperationResult result, BridgePtr bridge) {
+
+    NewMessage(FeedbackMessage(_request, FeedbackMessage::ID_START_RETRIEVING, _persistentData->GetActiveBridge()));
+
+    _fullConfigRetriever = _factory->CreateConfigRetriever(_appSettings->UseForcedActivation(), ConfigType::Full);
+    _fullConfigRetriever->Execute(_persistentData->GetActiveBridge(), [this](OperationResult result, BridgePtr bridge) {
         DISPATCH_P2(RetrieveFullConfigCompleted, result, bridge);
     });
 }
@@ -440,24 +507,12 @@ void ConnectionFlow::RetrieveFullConfigCompleted(OperationResult result, BridgeP
     if (_state != Retrieving)
         return;
 
-    auto wasConnected = _persistentData->GetActiveBridge()->IsConnected();
     _persistentData->SetActiveBridge(bridge);
 
     if (result == OPERATION_FAILED) {
-        NewMessage(FeedbackMessage(_request, FeedbackMessage::ID_FINISH_RETRIEVING_FAILED, _persistentData->GetActiveBridge()));
-        if (!bridge->IsValidIp() && bridge->IsAuthorized()) {
-            StartBridgeSearch();
-            return;
-        }
-        if (bridge->IsValidIp() && !bridge->IsAuthorized()) {
-            StartAuthentication(bridge);
-            return;
-        }
-        bridge->SetIsValidIp(false);
-        bridge->SetIsAuthorized(false);
-        ReportActionRequired();
+        RetrieveFailed(bridge);
     } else {
-        BridgeStatus status = _persistentData->GetActiveBridge()->GetStatus();
+        auto status = _persistentData->GetActiveBridge()->GetStatus();
         if (status == BRIDGE_INVALID_MODEL ||
             status == BRIDGE_INVALID_VERSION ||
             status == BRIDGE_INVALID_CLIENTKEY ||
@@ -471,11 +526,24 @@ void ConnectionFlow::RetrieveFullConfigCompleted(OperationResult result, BridgeP
         } else {
             NewMessage(FeedbackMessage(_request, FeedbackMessage::ID_FINISH_RETRIEVING_READY_TO_START, _persistentData->GetActiveBridge()));
         }
-    }
 
-    if (!wasConnected && _persistentData->GetActiveBridge()->IsConnected()) {
-        NewMessage(FeedbackMessage(_request, FeedbackMessage::ID_BRIDGE_CONNECTED, _persistentData->GetActiveBridge()));
+        StartSaving();
     }
+}
+
+void ConnectionFlow::RetrieveFailed(BridgePtr bridge) {
+    NewMessage(FeedbackMessage(_request, FeedbackMessage::ID_FINISH_RETRIEVING_FAILED, bridge));
+    if (!bridge->IsValidIp() && bridge->IsAuthorized()) {
+        StartBridgeSearch();
+        return;
+    }
+    if (bridge->IsValidIp() && !bridge->IsAuthorized()) {
+        StartAuthentication(bridge);
+        return;
+    }
+    bridge->SetIsValidIp(false);
+    bridge->SetIsAuthorized(false);
+    ReportActionRequired();
 
     StartSaving();
 }
@@ -515,19 +583,7 @@ void ConnectionFlow::ReportActionRequired() {
     }
 }
 
-void ConnectionFlow::SetNewActiveBridge(BridgePtr bridge) {
-    if (_persistentData->GetActiveBridge()->IsConnected() && _persistentData->GetActiveBridge()->GetId() != bridge->GetId()) {
-        NewMessage(FeedbackMessage(_request, FeedbackMessage::ID_BRIDGE_DISCONNECTED, _persistentData->GetActiveBridge()));
-        bridge->SetIsValidIp(false);
-    }
-    _persistentData->SetActiveBridge(bridge);
-}
-
 void ConnectionFlow::ClearBridge() {
-    if (_persistentData->GetActiveBridge()->IsConnected()) {
-        NewMessage(FeedbackMessage(_request, FeedbackMessage::ID_BRIDGE_DISCONNECTED, _persistentData->GetActiveBridge()));
-    }
-
     if (_request == FeedbackMessage::REQUEST_TYPE_RESET_BRIDGE) {
         _persistentData->ClearActiveBridge();
     }
@@ -541,7 +597,7 @@ void ConnectionFlow::ClearBridge() {
 }
 
 void ConnectionFlow::StartSaving() {
-    NewMessage(FeedbackMessage(_request, FeedbackMessage::ID_START_SAVING, _persistentData->GetActiveBridge(), _persistentData->GetBridges()));
+    NewMessage(FeedbackMessage(_request, FeedbackMessage::ID_START_SAVING, _persistentData->GetActiveBridge(), _persistentData->GetAllKnownBridges()));
     _state = Saving;
 
     _storageAccessor->Save(_persistentData, [this](OperationResult r) {
@@ -551,15 +607,17 @@ void ConnectionFlow::StartSaving() {
 
 void ConnectionFlow::SavingCompleted(OperationResult r) {
     if (r == OPERATION_SUCCESS) {
-        NewMessage(FeedbackMessage(_request, FeedbackMessage::ID_FINISH_SAVING_SAVED, _persistentData->GetActiveBridge(), _persistentData->GetBridges()));
+        NewMessage(FeedbackMessage(_request, FeedbackMessage::ID_FINISH_SAVING_SAVED, _persistentData->GetActiveBridge(), _persistentData->GetAllKnownBridges()));
     } else {
-        NewMessage(FeedbackMessage(_request, FeedbackMessage::ID_FINISH_SAVING_FAILED, _persistentData->GetActiveBridge(), _persistentData->GetBridges()));
+        NewMessage(FeedbackMessage(_request, FeedbackMessage::ID_FINISH_SAVING_FAILED, _persistentData->GetActiveBridge()));
     }
 
     _persistentData->GetActiveBridge()->SetIsBusy(false);
-    auto activationRequired = (_request == FeedbackMessage::REQUEST_TYPE_ACTIVATE || _appSettings->AutoStartAtConnection());
+    auto switchGroupWhileStreaming = (_bridgeStartState->IsStreaming() && _request == FeedbackMessage::REQUEST_TYPE_SELECT);
+    auto activationRequired = (_request == FeedbackMessage::REQUEST_TYPE_ACTIVATE || _appSettings->AutoStartAtConnection() || switchGroupWhileStreaming);
+    auto canActivateStreaming = (_persistentData->GetActiveBridge()->IsReadyToStream() || _persistentData->GetActiveBridge()->IsStreaming());
 
-    if (activationRequired && (_persistentData->GetActiveBridge()->IsReadyToStream() || _persistentData->GetActiveBridge()->IsStreaming())) {
+    if (activationRequired && canActivateStreaming) {
         ActivateStreaming();
     } else if (!activationRequired && _persistentData->GetActiveBridge()->IsReadyToStream()) {
         // If we do not have to start the connection, then we are done ...
@@ -573,11 +631,36 @@ void ConnectionFlow::SavingCompleted(OperationResult r) {
     }
 }
 
+bool ConnectionFlow::EvaluateBridgesSecurity(BridgeList bridges) {
+    bool changed = false;
+    for (auto&& bridge : bridges) {
+        if (bridge->GetIsUsingSsl()) {
+            // if ssl is already enabled, there's nothing to do
+            continue;
+        }
+
+        bool bridge_used_ssl = false;
+        for (auto&& existing_bridge : *_persistentData->GetBridges()) {
+            if (existing_bridge->GetId() == bridge->GetId() && existing_bridge->GetIsUsingSsl()) {
+                bridge_used_ssl = true;
+                break;
+            }
+        }
+
+        if (bridge_used_ssl || bridge->IsSupportingHttps()) {
+            bridge->EnableSsl();
+            if (!bridge_used_ssl) {
+                changed = true;
+            }
+        }
+    }
+
+    return changed;
+}
+
 void ConnectionFlow::ActivateStreaming() {
     NewMessage(FeedbackMessage(_request, FeedbackMessage::ID_START_ACTIVATING, _persistentData->GetActiveBridge()));
     _state = Activating;
-
-    auto wasActive = _persistentData->GetActiveBridge()->IsStreaming();
 
     bool result;
     if (_appSettings->UseRenderThread()) {
@@ -588,9 +671,6 @@ void ConnectionFlow::ActivateStreaming() {
 
     if (result) {
         NewMessage(FeedbackMessage(_request, FeedbackMessage::ID_FINISH_ACTIVATING_ACTIVE, _persistentData->GetActiveBridge()));
-        if (!wasActive) {
-            NewMessage(FeedbackMessage(_request, FeedbackMessage::ID_STREAMING_CONNECTED, _persistentData->GetActiveBridge()));
-        }
         NewMessage(FeedbackMessage(_request, FeedbackMessage::ID_DONE_COMPLETED, _persistentData->GetActiveBridge()));
     } else {
         NewMessage(FeedbackMessage(_request, FeedbackMessage::ID_FINISH_ACTIVATING_FAILED, _persistentData->GetActiveBridge()));
@@ -603,13 +683,7 @@ void ConnectionFlow::ActivateStreaming() {
 void ConnectionFlow::DeactivateStreaming() {
     _state = Deactivating;
 
-    auto wasActive = _persistentData->GetActiveBridge()->IsStreaming();
-
     _stream->Stop(_persistentData->GetActiveBridge());
-
-    if (wasActive) {
-        NewMessage(FeedbackMessage(_request, FeedbackMessage::ID_STREAMING_DISCONNECTED, _persistentData->GetActiveBridge()));
-    }
 
     Finish();
 }
@@ -618,6 +692,10 @@ void ConnectionFlow::Finish() {
     _state = Idle;
 
     if (_request != FeedbackMessage::REQUEST_TYPE_INTERNAL) {
+        auto differences = CompareBridges(_bridgeStartState, _persistentData->GetActiveBridge());
+        for (auto const& feedbackId : differences) {
+            NewMessage(FeedbackMessage(_request, feedbackId, _persistentData->GetActiveBridge()));
+        }
         NewMessage(FeedbackMessage(_request, FeedbackMessage::ID_USERPROCEDURE_FINISHED, _persistentData->GetActiveBridge()));
     }
 

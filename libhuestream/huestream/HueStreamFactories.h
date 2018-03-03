@@ -1,40 +1,66 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
 #ifndef HUESTREAM_HUESTREAMFACTORIES_H_
 #define HUESTREAM_HUESTREAMFACTORIES_H_
 
-#include <util/Factory.h>
-#include <huestream/stream/DtlsEntropyProvider.h>
-#include <huestream/connect/IBridgeStorageAccessor.h>
-#include <huestream/connect/BridgeFileStorageAccessor.h>
-#include <huestream/effect/Mixer.h>
-#include <huestream/common/language/DummyTranslator.h>
-#include <huestream/HueStream.h>
+#include <edtls/wrapper/mbedtls/EntropyProviderBase.h>
 
+#include <memory>
 #include <string>
 
+#include "support/util/Factory.h"
+#include "support/util/MakeUnique.h"
+#include "huestream/stream/DtlsEntropyProvider.h"
+#include "huestream/connect/IBridgeStorageAccessor.h"
+#include "huestream/connect/BridgeFileStorageAccessor.h"
+#include "huestream/connect/BasicGroupLightController.h"
+#include "huestream/effect/Mixer.h"
+#include "huestream/common/language/DummyTranslator.h"
+#include "huestream/IHueStream.h"
+
+using BridgeStorageAccessorFactory
+    = support::Factory<huestream::IBridgeStorageAccessor, const std::string&, huestream::BridgeSettingsPtr>;
+
+using MixerFactory = support::Factory<huestream::IMixer>;
+using MessageTranslatorFactory = support::Factory<huestream::IMessageTranslator, std::string>;
+using EntropyProviderFactory = support::Factory<EntropyProviderBase>;
+using ConnectFactory = support::Factory<huestream::IConnect, huestream::HttpClientPtr,
+        huestream::MessageDispatcherPtr, huestream::BridgeSettingsPtr,
+        huestream::AppSettingsPtr, huestream::StreamPtr, huestream::BridgeStorageAccessorPtr>;
+
+using HueStreamFactory = support::Factory<huestream::IStream, huestream::StreamSettingsPtr, huestream::AppSettingsPtr,
+        huestream::TimeManagerPtr, huestream::ConnectorPtr>;
+using HttpClientFactory = support::Factory<huestream::IHttpClient>;
+using ConnectionMonitorFactory
+    = support::Factory<huestream::IConnectionMonitor, huestream::HttpClientPtr, huestream::AppSettingsPtr>;
+
+using MixerFactory = support::Factory<huestream::IMixer>;
+using TimeManagerFactory = support::Factory<huestream::ITimeManager>;
+using MessageDispatcherFactory = support::Factory<huestream::IMessageDispatcher>;
+using ConnectorFactory = support::Factory<huestream::IConnector, huestream::ConfigPtr>;
+using GroupControllerFactory = support::Factory<huestream::IBasicGroupLightController, huestream::HttpClientPtr>;
 
 template<>
-EntropyProviderBasePtr huesdk_lib_default_factory<EntropyProviderBasePtr>();
+std::unique_ptr<EntropyProviderBase> huesdk_lib_default_factory<EntropyProviderBase>();
 
 template<>
-huestream::BridgeStorageAccessorPtr huesdk_lib_default_factory<huestream::BridgeStorageAccessorPtr,
+std::unique_ptr<huestream::IBridgeStorageAccessor> huesdk_lib_default_factory<huestream::IBridgeStorageAccessor,
                                                                 const std::string &,
                                                                 huestream::BridgeSettingsPtr>(const std::string &fileName,
                                                                                            huestream::BridgeSettingsPtr hueSettings);
 
 
 template<>
-huestream::MixerPtr huesdk_lib_default_factory<huestream::MixerPtr>();
+std::unique_ptr<huestream::IMixer> huesdk_lib_default_factory<huestream::IMixer>();
 
 template<>
-huestream::MessageTranslatorPtr huesdk_lib_default_factory<huestream::MessageTranslatorPtr, std::string>(std::string language);
+std::unique_ptr<huestream::IMessageTranslator> huesdk_lib_default_factory<huestream::IMessageTranslator, std::string>(std::string language);
 
 template<>
-huestream::ConnectPtr huesdk_lib_default_factory<huestream::ConnectPtr,
+std::unique_ptr<huestream::IConnect> huesdk_lib_default_factory<huestream::IConnect,
                                                     huestream::HttpClientPtr,
                                                     huestream::MessageDispatcherPtr,
                                                     huestream::BridgeSettingsPtr,
@@ -49,7 +75,7 @@ huestream::ConnectPtr huesdk_lib_default_factory<huestream::ConnectPtr,
     huestream::BridgeStorageAccessorPtr);
 
 template<>
-huestream::StreamPtr huesdk_lib_default_factory<huestream::StreamPtr,
+std::unique_ptr<huestream::IStream> huesdk_lib_default_factory<huestream::IStream,
                                                 huestream::StreamSettingsPtr,
                                                 huestream::AppSettingsPtr,
                                                 huestream::TimeManagerPtr,
@@ -60,25 +86,25 @@ huestream::StreamPtr huesdk_lib_default_factory<huestream::StreamPtr,
     huestream::ConnectorPtr connector);
 
 template<>
-huestream::HttpClientPtr huesdk_lib_default_factory<huestream::HttpClientPtr>();
+std::unique_ptr<huestream::IHttpClient> huesdk_lib_default_factory<huestream::IHttpClient>();
 
 template<>
-huestream::ConnectionMonitorPtr huesdk_lib_default_factory<huestream::ConnectionMonitorPtr,
+std::unique_ptr<huestream::IConnectionMonitor> huesdk_lib_default_factory<huestream::IConnectionMonitor,
                                                            huestream::HttpClientPtr, huestream::AppSettingsPtr>(
     huestream::HttpClientPtr httpClient, huestream::AppSettingsPtr appSettings);
 
 template<>
-huestream::TimeManagerPtr huesdk_lib_default_factory<huestream::TimeManagerPtr>();
+std::unique_ptr<huestream::ITimeManager> huesdk_lib_default_factory<huestream::ITimeManager>();
 
 template<>
-huestream::MessageDispatcherPtr huesdk_lib_default_factory<huestream::MessageDispatcherPtr>();
+std::unique_ptr<huestream::IMessageDispatcher> huesdk_lib_default_factory<huestream::IMessageDispatcher>();
 
 template<>
-huestream::ConnectorPtr huesdk_lib_default_factory<huestream::ConnectorPtr, huestream::ConfigPtr>(
+std::unique_ptr<huestream::IConnector> huesdk_lib_default_factory<huestream::IConnector, huestream::ConfigPtr>(
     huestream::ConfigPtr config);
 
 template<>
-huestream::BasicGroupLightControllerPtr huesdk_lib_default_factory<huestream::BasicGroupLightControllerPtr,
+std::unique_ptr<huestream::IBasicGroupLightController> huesdk_lib_default_factory<huestream::IBasicGroupLightController,
     huestream::HttpClientPtr>(huestream::HttpClientPtr httpClient);
 
 

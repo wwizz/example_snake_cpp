@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -35,8 +35,8 @@ BridgeStorageAccessorPtr ConnectionFlowFactory::GetStorageAccesser() {
     return _storageAccessor;
 }
 
-FullConfigRetrieverPtr ConnectionFlowFactory::CreateFullConfigRetriever(bool useForcedActivation) {
-    return std::make_shared<FullConfigRetriever>(_http, useForcedActivation);
+ConfigRetrieverPtr ConnectionFlowFactory::CreateConfigRetriever(bool useForcedActivation, ConfigType configType) {
+    return std::make_shared<ConfigRetriever>(_http, useForcedActivation, configType);
 }
 
 }  // namespace huestream

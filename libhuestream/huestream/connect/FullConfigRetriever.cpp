@@ -1,27 +1,29 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
-
-#include <huestream/connect/FullConfigRetriever.h>
-#include <huestream/common/http/IHttpClient.h>
-#include <network/http/HttpRequestError.h>
-#include <network/http/IHttpResponse.h>
-#include <network/http/HttpRequest.h>
 
 #include <algorithm>
 #include <memory>
 #include <string>
+#include <regex>
+
+#include "huestream/connect/FullConfigRetriever.h"
+#include "huestream/common/http/IHttpClient.h"
+#include "huestream/common/data/ApiVersion.h"
+#include "support/network/http/HttpRequestError.h"
+#include "support/network/http/IHttpResponse.h"
+#include "support/network/http/HttpRequest.h"
 
 namespace huestream {
 
 #define CLIP_ERROR_TYPE_UNAUTHORIZED_USER 1
 
-    FullConfigRetriever::FullConfigRetriever(const HttpClientPtr http, bool useForcedActivation) :
-    _http(http), _useForcedActivation(useForcedActivation), _busy(false) {
+    ConfigRetriever::ConfigRetriever(const HttpClientPtr http, bool useForcedActivation, ConfigType configType) :
+    _configType(configType), _http(http), _useForcedActivation(useForcedActivation), _busy(false) {
     }
 
-    bool FullConfigRetriever::Execute(BridgePtr bridge, RetrieveCallbackHandler cb) {
+    bool ConfigRetriever::Execute(BridgePtr bridge, RetrieveCallbackHandler cb) {
         std::unique_lock<std::mutex> lk(_mutex);
         if (_busy) {
             return false;
@@ -30,26 +32,27 @@ namespace huestream {
 
         _bridge = bridge;
         _cb = cb;
-        RetrieveFullConfig();
+        RetrieveConfig();
         return true;
     }
 
-    void FullConfigRetriever::RetrieveFullConfig() {
-        const auto fullConfigUrl = _bridge->GetBaseUrl();
-        _request = _http->CreateHttpRequest(fullConfigUrl);
+    void ConfigRetriever::RetrieveConfig() {
+        const auto configUrl = _configType == ConfigType::Small ? _bridge->GetSmallConfigUrl() : _bridge->GetBaseUrl();
+        _request = _http->CreateHttpRequest(configUrl);
+        _request->set_verify_ssl(false);
 
-        _request->do_get([&](const huesdk_lib::HttpRequestError &error, const huesdk_lib::IHttpResponse &response) {
-            if (error.get_code() == huesdk_lib::HttpRequestError::HTTP_REQUEST_ERROR_CODE_SUCCESS) {
+        _request->do_get([&](const support::HttpRequestError &error, const support::IHttpResponse &response) {
+            if (error.get_code() == support::HttpRequestError::HTTP_REQUEST_ERROR_CODE_SUCCESS) {
                 _response = response.get_body();
                 ParseResponseAndExecuteCallback();
-            } else if (error.get_code() != huesdk_lib::HttpRequestError::HTTP_REQUEST_ERROR_CODE_CANCELED) {
+            } else if (error.get_code() != support::HttpRequestError::HTTP_REQUEST_ERROR_CODE_CANCELED) {
                 _bridge->SetIsValidIp(false);
                 Finish(OPERATION_FAILED);
             }
         });
     }
 
-    void FullConfigRetriever::ParseResponseAndExecuteCallback() {
+    void ConfigRetriever::ParseResponseAndExecuteCallback() {
         if (!ParseToJson()) {
             Finish(OPERATION_FAILED);
             return;
@@ -65,14 +68,15 @@ namespace huestream {
             return;
         }
 
-        ParseGroups();
-
-        ParseCapabilities();
+        if (_configType == ConfigType::Full) {
+            ParseGroups();
+            ParseCapabilities();
+        }
 
         Finish(OPERATION_SUCCESS);
     }
 
-    bool FullConfigRetriever::ParseToJson() {
+    bool ConfigRetriever::ParseToJson() {
         JSONNode n = libjson::parse(_response);
         if (n.type() == JSON_NULL) {
             _bridge->SetIsValidIp(false);
@@ -82,7 +86,7 @@ namespace huestream {
         return true;
     }
 
-    bool FullConfigRetriever::CheckForNoErrorsInResponse() const {
+    bool ConfigRetriever::CheckForNoErrorsInResponse() const {
         bool hasError = false;
         bool hasUnauthorizedError = false;
 
@@ -114,13 +118,13 @@ namespace huestream {
         return true;
     }
 
-    bool FullConfigRetriever::ParseConfig() const {
-        if (!SerializerHelper::IsAttributeSet(&_root, "config")) {
+    bool ConfigRetriever::ParseConfig() const {
+        if (_configType == ConfigType::Full && !SerializerHelper::IsAttributeSet(&_root, "config")) {
             _bridge->SetIsValidIp(false);
             return false;
         }
 
-        JSONNode config = (_root)["config"];
+        JSONNode config = _configType == ConfigType::Full ? (_root)["config"] : _root;
         std::string name = "";
         Serializable::DeserializeValue(&config, "name", &name, "");
         _bridge->SetName(name);
@@ -133,16 +137,23 @@ namespace huestream {
         Serializable::DeserializeValue(&config, "apiversion", &apiversion, "");
         _bridge->SetApiversion(apiversion);
 
+        // ModelId is only introduced in api version 1.8.0, but older versions are always BSB001
+        ApiVersion thisVersion(apiversion);
+        ApiVersion modelIdSupportVersion("1.8.0");
+        if (_bridge->GetModelId().empty() && thisVersion.IsValid() && thisVersion < modelIdSupportVersion) {
+            _bridge->SetModelId("BSB001");
+        }
+
         std::string bridgeid = "";
         Serializable::DeserializeValue(&config, "bridgeid", &bridgeid, "");
         _bridge->SetId(bridgeid);
 
-        if (!SerializerHelper::IsAttributeSet(&_root, "groups")) {
+        if (_configType == ConfigType::Full && !SerializerHelper::IsAttributeSet(&_root, "groups")) {
             _bridge->SetIsValidIp(false);
             return false;
         }
 
-        if (!SerializerHelper::IsAttributeSet(&_root, "lights")) {
+        if (_configType == ConfigType::Full && !SerializerHelper::IsAttributeSet(&_root, "lights")) {
             _bridge->SetIsValidIp(false);
             return false;
         }
@@ -151,7 +162,7 @@ namespace huestream {
         return true;
     }
 
-    void FullConfigRetriever::ParseGroups() {
+    void ConfigRetriever::ParseGroups() {
         JSONNode groups = (_root)["groups"];
         auto parsedGroups = std::make_shared<GroupList>();
         for (auto jsonGroup = groups.begin(); jsonGroup != groups.end(); ++jsonGroup) {
@@ -163,11 +174,11 @@ namespace huestream {
         _bridge->SetGroups(parsedGroups);
     }
 
-    bool FullConfigRetriever::GroupIsEntertainment(const JSONNode &j) {
+    bool ConfigRetriever::GroupIsEntertainment(const JSONNode &j) {
         return (SerializerHelper::IsAttributeSet(&j, "type") && j["type"].as_string() == "Entertainment");
     }
 
-    std::shared_ptr<Group> FullConfigRetriever::ParseEntertainmentGroup(const JSONNode &node) {
+    std::shared_ptr<Group> ConfigRetriever::ParseEntertainmentGroup(const JSONNode &node) {
         auto groupId = node.name();
 
         auto group = std::make_shared<Group>();
@@ -181,7 +192,7 @@ namespace huestream {
 
         ParseLightsAndLocations(node, group);
 
-        ParseStreamActive(node, group);
+        ParseStream(node, group);
 
         ParseGroupState(node, group);
 
@@ -190,7 +201,7 @@ namespace huestream {
         return group;
     }
 
-    void FullConfigRetriever::ParseClass(const JSONNode &node, GroupPtr group) {
+    void ConfigRetriever::ParseClass(const JSONNode &node, GroupPtr group) {
         if (SerializerHelper::IsAttributeSet(&node, "class")) {
             if (node["class"].as_string() == "TV") {
                 group->SetClassType(GROUPCLASS_TV);
@@ -202,7 +213,7 @@ namespace huestream {
         }
     }
 
-    void FullConfigRetriever::ParseLightsAndLocations(const JSONNode &node, GroupPtr group) const {
+    void ConfigRetriever::ParseLightsAndLocations(const JSONNode &node, GroupPtr group) const {
         auto avgBri = 0.0;
         auto numReachableLights = 0;
         if (SerializerHelper::IsAttributeSet(&node, "locations")) {
@@ -225,24 +236,52 @@ namespace huestream {
         group->SetBrightnessState(avgBri / 254);
     }
 
-    void FullConfigRetriever::ParseStreamActive(const JSONNode &node, GroupPtr group) {
+    void ConfigRetriever::ParseStream(const JSONNode &node, GroupPtr group) {
         if (SerializerHelper::IsAttributeSet(&node, "stream")) {
             auto stream = node["stream"];
-            if (SerializerHelper::IsAttributeSet(&stream, "active") &&
-                SerializerHelper::IsAttributeSet(&stream, "owner")) {
-                auto active = stream["active"].as_bool();
-                group->SetActive(active);
-                if (active) {
-                    auto owner = stream["owner"].as_string();
-                    group->SetOwner(owner);
-                    group->SetFriendlyOwnerName(GetFriendlyName(owner));
-                }
+            ParseStreamActive(stream, group);
+            ParseStreamProxy(stream, group);
+        }
+    }
+
+    void ConfigRetriever::ParseStreamActive(const JSONNode &node, GroupPtr group) {
+        if (SerializerHelper::IsAttributeSet(&node, "active") &&
+            SerializerHelper::IsAttributeSet(&node, "owner")) {
+            auto active = node["active"].as_bool();
+            group->SetActive(active);
+            if (active) {
+                auto owner = node["owner"].as_string();
+                group->SetOwner(owner);
+                group->SetOwnerName(GetOwnerName(owner));
             }
         }
     }
 
-    void FullConfigRetriever::ParseGroupState(const JSONNode &node, GroupPtr group)
-    {
+    void ConfigRetriever::ParseStreamProxy(const JSONNode &node, GroupPtr group) {
+        if (SerializerHelper::IsAttributeSet(&node, "proxymode") &&
+            SerializerHelper::IsAttributeSet(&node, "proxynode")) {
+            GroupProxyNode proxyNode;
+            proxyNode.uri = node["proxynode"].as_string();
+            proxyNode.mode = node["proxymode"].as_string();
+
+            std::regex re("/lights/(\\d+)");
+            std::smatch match;
+            if (std::regex_search(proxyNode.uri, match, re) && match.size() == 2) {
+                auto light = GetLightInfo(match.str(1));
+                proxyNode.name = light.GetName();
+                proxyNode.model = light.GetModel();
+                proxyNode.isReachable = light.Reachable();
+            } else {
+                proxyNode.name = _bridge->GetName();
+                proxyNode.model = _bridge->GetModelId();
+                proxyNode.isReachable = true;
+            }
+
+            group->SetProxyNode(proxyNode);
+        }
+    }
+
+    void ConfigRetriever::ParseGroupState(const JSONNode &node, GroupPtr group) {
         if (SerializerHelper::IsAttributeSet(&node, "state")) {
             auto state = node["state"];
             if (SerializerHelper::IsAttributeSet(&state, "any_on")) {
@@ -252,7 +291,7 @@ namespace huestream {
         }
     }
 
-    std::string FullConfigRetriever::GetFriendlyName(const std::string &userName) {
+    std::string ConfigRetriever::GetOwnerName(const std::string &userName) {
         std::string name = "";
         JSONNode config = (_root)["config"];
         if (SerializerHelper::IsAttributeSet(&config, "whitelist")) {
@@ -265,7 +304,7 @@ namespace huestream {
         return name;
     }
 
-    LightInfo FullConfigRetriever::GetLightInfo(const std::string &id) const {
+    LightInfo ConfigRetriever::GetLightInfo(const std::string &id) const {
         std::string name = "";
         std::string model = "";
         auto reachable = true;
@@ -294,7 +333,7 @@ namespace huestream {
         return lightInfo;
     }
 
-    void FullConfigRetriever::ParseScenes(const JSONNode &node, GroupPtr group) {
+    void ConfigRetriever::ParseScenes(const JSONNode &node, GroupPtr group) {
         if (!SerializerHelper::IsAttributeSet(&_root, "scenes")) {
             return;
         }
@@ -311,11 +350,11 @@ namespace huestream {
         group->SetScenes(parsedScenes);
     }
 
-    bool FullConfigRetriever::SceneIsNotRecyclable(const JSONNode &j) {
+    bool ConfigRetriever::SceneIsNotRecyclable(const JSONNode &j) {
         return (SerializerHelper::IsAttributeSet(&j, "recycle") && j["recycle"].as_bool() == false);
     }
 
-    ScenePtr FullConfigRetriever::ParseScene(const JSONNode &node) {
+    ScenePtr ConfigRetriever::ParseScene(const JSONNode &node) {
         std::string name("");
         std::string appData("");
         Serializable::DeserializeValue(&node, "name", &name, "");
@@ -326,7 +365,7 @@ namespace huestream {
         return std::make_shared<Scene>(node.name(), name, appData);
     }
 
-    void FullConfigRetriever::ParseCapabilities() const {
+    void ConfigRetriever::ParseCapabilities() const {
         if (!SerializerHelper::IsAttributeSet(&_root, "capabilities")) {
             return;
         }
@@ -349,7 +388,13 @@ namespace huestream {
         }
     }
 
-    void FullConfigRetriever::Finish(OperationResult result) {
+    void ConfigRetriever::Finish(OperationResult result) {
+        if (result == OPERATION_FAILED && _bridge->IsValidGroupSelected() &&
+            _bridge->GetGroup()->Active() && _bridge->GetGroup()->GetOwner() == _bridge->GetUser()) {
+            _bridge->GetGroup()->SetActive(false);
+            _bridge->GetGroup()->SetOwner("");
+        }
+
         _cb(result, _bridge);
         _busy = false;
     }

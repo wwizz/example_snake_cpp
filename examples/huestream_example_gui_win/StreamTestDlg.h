@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -27,6 +27,8 @@ public:
 
     void ChangeMode(bool useUDP);
 
+    HueStreamPtr GetHueStream();
+
 #ifdef AFX_DESIGN_TIME
     enum { IDD = IDD_STREAMTEST_DIALOG };
 #endif
@@ -52,6 +54,8 @@ protected:
     DECLARE_MESSAGE_MAP()
 
     bool IsUDPForcedByCommandLine();
+
+    const std::string GetDeviceName() const;
 
     void InitializeUserInterface();
 
@@ -118,6 +122,8 @@ protected:
     void DisablePolice();
 
     void DisableAll();
+
+    LightScriptPtr CreateExampleScript();
 
     UINT_PTR m_timerVal = 0;
     CEdit m_edit_ip;

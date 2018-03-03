@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 /** @file */
@@ -13,6 +13,7 @@
 #include <huestream/common/data/Group.h>
 
 #include <map>
+#include <vector>
 #include <string>
 #include <sstream>
 
@@ -89,6 +90,11 @@ class Bridge : public Serializable {
      get bridge uri
      */
     virtual std::string GetBaseUrl() const;
+
+    /**
+     get bridge small config uri
+     */
+    virtual std::string GetSmallConfigUrl() const;
 
     /**
      get uri for selected entertainment group
@@ -173,6 +179,16 @@ class Bridge : public Serializable {
     virtual GroupPtr GetGroup() const;
 
     /**
+     get list of lights in the currently selected group
+     */
+    virtual LightListPtr GetGroupLights() const;
+
+    /**
+     get group with specific id or nullptr if none exists
+     */
+    virtual GroupPtr GetGroupById(std::string id) const;
+
+    /**
      delete a group from list of groups in the bridge
      @note only on this bridge object not on actual bridge, mainly internal use
      @param id Id of the entertainment group to select
@@ -180,9 +196,9 @@ class Bridge : public Serializable {
     virtual void DeleteGroup(std::string id);
 
     /**
-     get group which another client is currently streaming to or nullptr if there is no such group
+     get groups which another client is currently streaming to
      */
-    virtual GroupPtr GetGroupOwnedByOtherClient() const;
+    virtual GroupListPtr GetGroupsOwnedByOtherClient() const;
 
     /**
      get number of current active streaming sessions on bridge
@@ -199,13 +215,35 @@ class Bridge : public Serializable {
      */
     virtual bool IsValidGroupSelected() const;
 
- PROP_DEFINE(Bridge, BridgeSettingsPtr, bridgeSettings, BridgeSettings);
+    /**
+     check if the proxyNode of the current group is unreachable
+     */
+    virtual bool IsProxyNodeUnreachable() const;
+
+    /**
+     create deep copy of this bridge object
+     */
+    std::shared_ptr<Bridge> Clone() const;
+
+    /**
+     enable HTTPS on the bridge
+     */
+    void EnableSsl();
+
+    /**
+     check if bridge version supports HTTPS
+     */
+    bool IsSupportingHttps() const;
+
+
+PROP_DEFINE(Bridge, BridgeSettingsPtr, bridgeSettings, BridgeSettings);
  PROP_DEFINE(Bridge, std::string, name, Name);
  PROP_DEFINE(Bridge, std::string, modelId, ModelId);
  PROP_DEFINE(Bridge, std::string, apiversion, Apiversion);
  PROP_DEFINE(Bridge, std::string, id, Id);
  PROP_DEFINE(Bridge, std::string, ipAddress, IpAddress);
  PROP_DEFINE(Bridge, std::string, tcpPort, TcpPort);
+ PROP_DEFINE(Bridge, std::string, sslPort, SslPort);
  PROP_DEFINE_BOOL(Bridge, bool, isValidIp, IsValidIp);
  PROP_DEFINE_BOOL(Bridge, bool, isAuthorized, IsAuthorized);
  PROP_DEFINE_BOOL(Bridge, bool, isBusy, IsBusy);
@@ -214,6 +252,7 @@ class Bridge : public Serializable {
  PROP_DEFINE(Bridge, GroupListPtr, groups, Groups);
  PROP_DEFINE(Bridge, std::string, selectedGroup, SelectedGroup);
  PROP_DEFINE(Bridge, int, maxNoStreamingSessions, MaxNoStreamingSessions);
+ PROP_DEFINE_GET(Bridge, bool, isUsingSsl, IsUsingSsl);
 
  protected:
     virtual void SerializeBase(JSONNode *node) const;

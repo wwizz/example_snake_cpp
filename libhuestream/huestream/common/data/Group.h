@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 /** @file */
@@ -25,6 +25,17 @@ namespace huestream {
         GROUPCLASS_FREE,    ///< No reference point is used  (e.g. for audio)
         GROUPCLASS_OTHER    ///< Unknown (application defined) reference point
     };
+
+    /**
+     node which is the proxy for sending stream messages in the mesh network
+     */
+    typedef struct {
+        std::string uri;
+        std::string mode;
+        std::string name;
+        std::string model;
+        bool isReachable;
+    } GroupProxyNode;
 
     /**
      defintion of a group of lights used as an entertainment setup to play light effects on
@@ -73,7 +84,13 @@ namespace huestream {
      Set name of application currently streaming to this group
      @note mostly internal use, imported from bridge
      */
-    PROP_DEFINE(Group, std::string, friendlyOwnerName, FriendlyOwnerName);
+    PROP_DEFINE(Group, std::string, ownerName, OwnerName);
+
+    /**
+     Set proxy node
+     @note mostly internal use, imported from bridge
+     */
+    PROP_DEFINE(Group, GroupProxyNode, proxyNode, ProxyNode);
 
     /**
      Get list of scenes for this group
@@ -108,6 +125,21 @@ namespace huestream {
          */
         void AddLight(std::string id, double x, double y, std::string name = "", std::string model = "", bool reachable = true);
 
+        /**
+         get readable version of the owner name
+         */
+        std::string GetFriendlyOwnerName() const;
+
+        /**
+         get owner application name
+         */
+        std::string GetOwnerApplicationName() const;
+
+        /**
+         get owner device name (if available, else empty string)
+         */
+        std::string GetOwnerDeviceName() const;
+
         void Serialize(JSONNode *node) const override;
 
         void Deserialize(JSONNode *node) override;
@@ -120,6 +152,7 @@ namespace huestream {
         double Clip(double value, double min, double max) const;
         void SerializeClass(JSONNode *node) const;
         void DeserializeClass(JSONNode *node);
+        std::vector<std::string> Split(const std::string& s, char delimiter) const;
 
         static const std::map<GroupClass, std::string> _classSerializeMap;
     };

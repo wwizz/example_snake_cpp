@@ -5,13 +5,14 @@ using System.Threading;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace huestream_tests.tests
+namespace huestream_tests
 {
     [TestFixture()]
     public class TestAnimations : TestBase
     {
         private static String RGB_BLACK = "#000000";
         private static int LIGHTS_COUNT = 4;
+        private static double TIMEOUT_MS = 1000;
 
         protected Light _frontLeftLight = null;
         protected Light _frontRightLight = null;
@@ -34,14 +35,12 @@ namespace huestream_tests.tests
 
             _hue_stream.ConnectManualBridgeInfo(_bridge);
 
-            ThreadWaitFor(100);
             _allLights.ForEach(light => AssertSameColor(RGB_BLACK, light));
         }
 
         [TearDown]
         public void TearDown()
         {
-            ThreadWaitFor(100);
             CleanupUser();
             _hue_stream.ShutDown();
         }
@@ -110,26 +109,41 @@ namespace huestream_tests.tests
             _hue_stream.UnlockMixer();
         }
 
-        private void AssertSameColor(String expectedColor, params Light[] lights)
-        {
+        private void AssertColor(Func<String, Boolean> successCondition, Action<String, double>  after, params Light[] lights) {
             Assert.AreNotEqual(0, lights.Length, "Incoming lights collection is empty");
 
             foreach (var light in lights)
             {
+                DateTime a = DateTime.Now;
                 String actualColor = _bridgeWrapperHelper.GetLightRGBColor(light.AsLightID());
-                Assert.IsTrue(actualColor == expectedColor, $"Colors are not equal, expected={expectedColor}, actual={actualColor}");
+                double diff = 0;
+                while (!successCondition(actualColor) && diff < TIMEOUT_MS) {
+                    actualColor = _bridgeWrapperHelper.GetLightRGBColor(light.AsLightID());
+                    ThreadWaitFor(10);
+                    diff = (DateTime.Now - a).TotalMilliseconds;
+                }
+                after(actualColor, diff);
             }
+        }
+
+        private void AssertSameColor(String expectedColor, params Light[] lights)
+        {
+            Func<string, bool> successCondition = (actualColor) => actualColor == expectedColor;
+            AssertColor(
+                successCondition,
+                (actualColor, timeout) => Assert.IsTrue(successCondition(actualColor), $"Colors are not equal, expected={expectedColor}, actual={actualColor}, timeout={timeout} ms"),
+                lights
+            );
         }
 
         private void AssertDifferentColor(String expectedColor, params Light[] lights)
         {
-            Assert.AreNotEqual(0, lights.Length, "Incoming lights collection is empty");
-
-            foreach (var light in lights)
-            {
-                String actualColor = _bridgeWrapperHelper.GetLightRGBColor(light.AsLightID());
-                Assert.IsTrue(actualColor != expectedColor, $"Colors are equal, expected={expectedColor}, actual={actualColor}");
-            }
+            Func<string, bool> successCondition = (actualColor) => actualColor != expectedColor;
+            AssertColor(
+                successCondition,
+                (actualColor, timeout) => Assert.IsTrue(successCondition(actualColor), $"Colors are equal, expected={expectedColor}, actual={actualColor}, timeout={timeout} ms"),
+                lights
+            );
         }
 
         [Test]
@@ -213,7 +227,6 @@ namespace huestream_tests.tests
             AddEffectToEngine(effect);
             effect.Enable();
 
-            ThreadWaitFor(100);
             AssertDifferentColor(RGB_BLACK, _rearRightLight);
             AssertSameColor(RGB_BLACK, _frontRightLight, _frontLeftLight, _rearLeftLight);
 

@@ -1,6 +1,6 @@
 #include "gtest/gtest.h"
 #include "TestConnectionFlowBase.h"
-#include "test/huestream/_mock/MockFullConfigRetriever.h"
+#include "test/huestream/_mock/MockConfigRetriever.h"
 
 #include <huestream/config/Config.h>
 #include <huestream/HueStream.h>
@@ -16,26 +16,44 @@ void TestConnectionFlowBase::SetUp() {
     _settings->SetUseRenderThread(true);
     _config->SetAppSettings(_settings);
     _stream = std::make_shared<MockStream>();
+    _persistentData = std::make_shared<HueStreamData>(std::make_shared<BridgeSettings>());
 
-    _bridges = std::make_shared<BridgeList>(3);
+    _bridges = std::make_shared<BridgeList>(6);
     _bridges->at(0) = std::make_shared<Bridge>("001788FFFE2007AA", "192.168.1.34", true, std::make_shared<BridgeSettings>());
     _bridges->at(1) = std::make_shared<Bridge>("001788FFFE2007BB", "192.168.1.35", true, std::make_shared<BridgeSettings>());
     _bridges->at(2) = std::make_shared<Bridge>("001788FFFE2007CC", "192.168.1.36", true, std::make_shared<BridgeSettings>());
+    _bridges->at(3) = std::make_shared<Bridge>("001788FFFE2007DD", "192.168.1.36", true, std::make_shared<BridgeSettings>());
+    _bridges->at(4) = std::make_shared<Bridge>("001788FFFE2007EE", "192.168.1.36", true, std::make_shared<BridgeSettings>());
+    _bridges->at(5) = std::make_shared<Bridge>("001788FFFE2007FF", "192.168.1.36", true, std::make_shared<BridgeSettings>());
     _bridges->at(0)->SetApiversion("1.22.0");
     _bridges->at(1)->SetApiversion("1.22.0");
     _bridges->at(2)->SetApiversion("1.22.0");
+    _bridges->at(3)->SetApiversion("");
+    _bridges->at(4)->SetApiversion("1.24.0");
+    _bridges->at(5)->SetApiversion("1.24.0");
     _bridges->at(0)->SetModelId("BSB002");
     _bridges->at(1)->SetModelId("BSB002");
     _bridges->at(2)->SetModelId("BSB002");
+    _bridges->at(3)->SetModelId("BSB002");
+    _bridges->at(4)->SetModelId("BSB002");
+    _bridges->at(5)->SetModelId("BSB001");
+
     _searchers = std::make_shared<vector<shared_ptr<MockBridgeSearcher>>>();
-    _authenticators = std::make_shared<vector<shared_ptr<MockBridgeAuthenticator>>>(3);
+    _authenticators = std::make_shared<vector<shared_ptr<MockBridgeAuthenticator>>>(6);
     _factory = std::make_shared<MockConnectionFlowFactory>();
     _messageDispatcher = std::make_shared<StubMessageDispatcher>();
     EXPECT_CALL(*_factory, GetMessageDispatcher()).WillRepeatedly(Return(_messageDispatcher));
-    _storageAccesser = std::make_shared<MockBridgeStorageAccesser>();
-    _fullConfigRetriever = std::make_shared<MockFullConfigRetriever>();
-    EXPECT_CALL(*_factory, CreateFullConfigRetriever(_)).WillRepeatedly(Return(_fullConfigRetriever));
+    _storageAccesser = std::make_shared<MockBridgeStorageAccessor>();
+    _smallConfigRetriever = std::make_shared<MockConfigRetriever>();
+    _fullConfigRetriever = std::make_shared<MockConfigRetriever>();
+    EXPECT_CALL(*_factory, CreateConfigRetriever(_, ConfigType::Small)).WillRepeatedly(Return(_smallConfigRetriever));
+    EXPECT_CALL(*_factory, CreateConfigRetriever(_, ConfigType::Full)).WillRepeatedly(Return(_fullConfigRetriever));
     _connectionFlow = std::make_shared<TestableConnectionFlow>(_factory, _stream, std::make_shared<BridgeSettings>(), _settings, _storageAccesser);
+    ON_CALL(*_connectionFlow, NewMessage(_)).WillByDefault(Invoke(PrintDebugMsg));
+    
+    //No need to verify ID_LIGHTS_UPDATED and ID_GROUP_LIGHTSTATE_UPDATED messages in connectionflow test
+    EXPECT_CALL(*_connectionFlow, NewMessage(FbMessage(FeedbackMessage::ID_LIGHTS_UPDATED, FeedbackMessage::FEEDBACK_TYPE_INFO))).Times(AtLeast(0));
+    EXPECT_CALL(*_connectionFlow, NewMessage(FbMessage(FeedbackMessage::ID_GROUP_LIGHTSTATE_UPDATED, FeedbackMessage::FEEDBACK_TYPE_INFO))).Times(AtLeast(0));
 }
 
 void TestConnectionFlowBase::TearDown() {
@@ -48,15 +66,23 @@ bool TestConnectionFlowBase::int2bool(int param) {
 }
 
 void TestConnectionFlowBase::expect_message(FeedbackMessage::Id id, FeedbackMessage::FeedbackType type) {
+    PrintExpectMsg(id);
     EXPECT_CALL(*_connectionFlow, NewMessage(FbMessage(id, type))).Times(1).WillRepeatedly(Invoke(PrintDebugMsg));
 }
 
 void TestConnectionFlowBase::expect_message(FeedbackMessage::Id id, FeedbackMessage::FeedbackType type, BridgePtr bridge) {
+    PrintExpectMsg(id);
     EXPECT_CALL(*_connectionFlow, NewMessage(FbMessageWithBridge(id, type, bridge))).Times(1).WillRepeatedly(Invoke(PrintDebugMsg));
 }
 
 void TestConnectionFlowBase::expect_message(FeedbackMessage::Id id, FeedbackMessage::FeedbackType type, BridgePtr bridge, BridgeStatus status) {
+    PrintExpectMsg(id);
     EXPECT_CALL(*_connectionFlow, NewMessage(FbMessageWithBridgeAndStatus(id, type, bridge, status))).Times(1).WillRepeatedly(Invoke(PrintDebugMsg));
+}
+
+void TestConnectionFlowBase::expect_message(FeedbackMessage::Id id, FeedbackMessage::FeedbackType type, int bridgeListSize) {
+    PrintExpectMsg(id);
+    EXPECT_CALL(*_connectionFlow, NewMessage(FbMessageWithBridgeList(id, type, bridgeListSize))).Times(1).WillRepeatedly(Invoke(PrintDebugMsg));
 }
 
 void TestConnectionFlowBase::expect_no_actions() {
@@ -180,8 +206,7 @@ void TestConnectionFlowBase::searching_with_three_bridges_found_starts_pushlink_
     finish_search_with_three_bridges(get_last_searcher());
 }
 
-void TestConnectionFlowBase::searching_with_one_bridge_found_starts_pushlink() {
-    int index = 0;
+void TestConnectionFlowBase::searching_with_one_bridge_found_starts_pushlink(int index) {
     expect_message(FeedbackMessage::ID_FINISH_SEARCH_BRIDGES_FOUND, FeedbackMessage::FEEDBACK_TYPE_INFO);
     expect_message(FeedbackMessage::ID_START_AUTHORIZING, FeedbackMessage::FEEDBACK_TYPE_INFO);
     expect_message(FeedbackMessage::ID_PRESS_PUSH_LINK, FeedbackMessage::FEEDBACK_TYPE_USER);
@@ -264,6 +289,27 @@ void TestConnectionFlowBase::finish_authorization_successfully(int index) {
     _messageDispatcher->ExecutePendingActions();
 }
 
+void TestConnectionFlowBase::expect_storage_accessor_load_return_data() {
+    expect_message(FeedbackMessage::ID_START_LOADING, FeedbackMessage::FEEDBACK_TYPE_INFO);
+    expect_message(FeedbackMessage::ID_FINISH_LOADING_BRIDGE_CONFIGURED, FeedbackMessage::FEEDBACK_TYPE_INFO);
+    EXPECT_CALL(*_storageAccesser, Load(_)).Times(1).WillOnce(InvokeArgument<0>(OPERATION_SUCCESS, _persistentData));
+}
+
+void TestConnectionFlowBase::expect_small_config_retrieval_return_data(int bridge_index) {
+    expect_small_config_retrieval_return_data(_bridges->at(bridge_index));
+}
+
+void TestConnectionFlowBase::expect_small_config_retrieval_return_data(BridgePtr bridge) {
+    expect_message(FeedbackMessage::ID_START_RETRIEVING_SMALL, FeedbackMessage::FEEDBACK_TYPE_INFO);
+    expect_message(FeedbackMessage::ID_FINISH_RETRIEVING_SMALL, FeedbackMessage::FEEDBACK_TYPE_INFO);
+    EXPECT_CALL(*_smallConfigRetriever, Execute(_, _)).Times(1).WillOnce(DoAll(InvokeArgument<1>(OPERATION_SUCCESS, bridge), Return(true)));
+}
+
+void TestConnectionFlowBase::expect_initiate_small_config_retrieval() {
+    expect_message(FeedbackMessage::ID_START_RETRIEVING_SMALL, FeedbackMessage::FEEDBACK_TYPE_INFO);
+    expect_on_small_config_retriever_execute();
+}
+
 void TestConnectionFlowBase::expect_initiate_full_config_retrieval() {
     expect_message(FeedbackMessage::ID_START_RETRIEVING, FeedbackMessage::FEEDBACK_TYPE_INFO);
     expect_on_full_config_retriever_execute();
@@ -290,12 +336,27 @@ void TestConnectionFlowBase::retrieve_full_config(int index, unsigned int numGro
     _messageDispatcher->ExecutePendingActions();
 }
 
-void TestConnectionFlowBase::finish_with_stream_start(BridgePtr bridge) {
+void TestConnectionFlowBase::checkUpdateMessages(bool connected, bool groupsUpdated,bool bridgeChanged) {
+    if (connected) {
+        expect_message(FeedbackMessage::ID_BRIDGE_CONNECTED, FeedbackMessage::FEEDBACK_TYPE_INFO);
+    }
+    if (bridgeChanged) {
+        expect_message(FeedbackMessage::ID_BRIDGE_CHANGED, FeedbackMessage::FEEDBACK_TYPE_INFO);
+    }
+    if (groupsUpdated) {
+        expect_message(FeedbackMessage::ID_GROUPLIST_UPDATED, FeedbackMessage::FEEDBACK_TYPE_INFO);
+    }
+}
+
+void TestConnectionFlowBase::finish_with_stream_start(BridgePtr bridge, bool connected, bool groupsUpdated, bool streamConnected, bool bridgeChanged) {
     expect_message(FeedbackMessage::ID_FINISH_SAVING_SAVED, FeedbackMessage::FEEDBACK_TYPE_INFO);
     expect_message(FeedbackMessage::ID_START_ACTIVATING, FeedbackMessage::FEEDBACK_TYPE_INFO);
     expect_message(FeedbackMessage::ID_FINISH_ACTIVATING_ACTIVE, FeedbackMessage::FEEDBACK_TYPE_INFO, bridge, BRIDGE_STREAMING);
-    expect_message(FeedbackMessage::ID_STREAMING_CONNECTED, FeedbackMessage::FEEDBACK_TYPE_INFO);
+    if (streamConnected) {
+        expect_message(FeedbackMessage::ID_STREAMING_CONNECTED, FeedbackMessage::FEEDBACK_TYPE_INFO);
+    }
     expect_message(FeedbackMessage::ID_DONE_COMPLETED, FeedbackMessage::FEEDBACK_TYPE_INFO);
+    checkUpdateMessages(connected, groupsUpdated, bridgeChanged);
     expect_message(FeedbackMessage::ID_USERPROCEDURE_FINISHED, FeedbackMessage::FEEDBACK_TYPE_INFO);
     
     if (_settings->UseRenderThread()) {
@@ -307,11 +368,12 @@ void TestConnectionFlowBase::finish_with_stream_start(BridgePtr bridge) {
     _messageDispatcher->ExecutePendingActions();
 }
 
-void TestConnectionFlowBase::finish_without_stream_start(bool completed) {
+void TestConnectionFlowBase::finish_without_stream_start(bool completed, bool connected, bool groupsUpdated, bool bridgeChanged) {
     expect_message(FeedbackMessage::ID_FINISH_SAVING_SAVED, FeedbackMessage::FEEDBACK_TYPE_INFO);
     if (completed) {
         expect_message(FeedbackMessage::ID_DONE_COMPLETED, FeedbackMessage::FEEDBACK_TYPE_INFO);
     }
+    checkUpdateMessages(connected, groupsUpdated, bridgeChanged);
     expect_message(FeedbackMessage::ID_USERPROCEDURE_FINISHED, FeedbackMessage::FEEDBACK_TYPE_INFO);
     _storageAccesser->save_callback(OPERATION_SUCCESS);
     _messageDispatcher->ExecutePendingActions();
@@ -339,15 +401,6 @@ void TestConnectionFlowBase::searching_with_abort_finalizes() {
 
 void TestConnectionFlowBase::select_group_existing(int bridgeindex, string groupid) {
     expect_message(FeedbackMessage::ID_USERPROCEDURE_STARTED, FeedbackMessage::FEEDBACK_TYPE_INFO);
-    expect_on_storage_accesser_save();
-    _connectionFlow->SelectGroup(groupid);
-    _messageDispatcher->ExecutePendingActions();
-}
-
-void TestConnectionFlowBase::select_group_not_existing(int bridgeindex, string groupid) {
-    expect_message(FeedbackMessage::ID_USERPROCEDURE_STARTED, FeedbackMessage::FEEDBACK_TYPE_INFO);
-    expect_message(FeedbackMessage::ID_DONE_ACTION_REQUIRED, FeedbackMessage::FEEDBACK_TYPE_INFO);
-    expect_message(FeedbackMessage::ID_SELECT_GROUP, FeedbackMessage::FEEDBACK_TYPE_USER, _bridges->at(bridgeindex), BRIDGE_INVALID_GROUP_SELECTED);
     expect_on_storage_accesser_save();
     _connectionFlow->SelectGroup(groupid);
     _messageDispatcher->ExecutePendingActions();

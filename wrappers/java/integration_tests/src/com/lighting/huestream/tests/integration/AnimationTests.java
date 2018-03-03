@@ -15,11 +15,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
 
 public class AnimationTests extends BaseTest {
 
     private static String RGB_BLACK = "#000000";
     private static int LIGHTS_COUNT = 4;
+    private static long TIMEOUT_MS = 1000;
 
     private Light _frontLeftLight = null;
     private Light _frontRightLight = null;
@@ -47,13 +50,11 @@ public class AnimationTests extends BaseTest {
 
         _hue_stream.ConnectManualBridgeInfo(_bridge);
 
-        threadWaitFor(100);
         _allLights.forEach(light -> expectSameColor(RGB_BLACK, light));
     }
 
     @After
     public void tearDown() {
-        threadWaitFor(1000);
         _bridgeWrapperHelper.cleanUpUser();
         _hue_stream.ShutDown();
     }
@@ -118,29 +119,39 @@ public class AnimationTests extends BaseTest {
         _hue_stream.UnlockMixer();
     }
 
-    private void expectSameColor(final String expectedColor, Light... lights) {
+    private void expectColor(Function<String, Boolean> successCondition, BiConsumer<String, Long>  after, Light... lights) {
         Assert.assertNotEquals("Incoming lights collection is empty", 0, lights.length);
-
+        long startedAt = System.currentTimeMillis();
         for (Light light : lights) {
-            final String actualColor = _bridgeWrapperHelper.getLightRBGColor(light.asLightID());
-
-            _errorCollector.checkThat(String.format("Colors are not equal, expected=%s, actual %s", expectedColor, actualColor),
-                    actualColor, CoreMatchers.equalTo(expectedColor));
+            String actualColor = _bridgeWrapperHelper.getLightRBGColor(light.asLightID());
+            long diffMs = System.currentTimeMillis() - startedAt;
+            while (!successCondition.apply(actualColor) && diffMs < TIMEOUT_MS) {
+                threadWaitFor(10);
+                actualColor = _bridgeWrapperHelper.getLightRBGColor(light.asLightID());
+                diffMs = System.currentTimeMillis() - startedAt;
+            }
+            after.accept(actualColor, diffMs);
         }
+    }
+
+    private void expectSameColor(final String expectedColor, Light... lights) {
+        expectColor(
+            (actualColor) -> actualColor.equals(expectedColor),
+            (actualColor, timeout) -> _errorCollector.checkThat(String.format("Colors are not equal, expected=%s, actual %s, timeout %d ms", expectedColor, actualColor, timeout),
+                                      actualColor, CoreMatchers.equalTo(expectedColor)),
+            lights);
     }
 
     private void expectDifferentColor(final String expectedColor, Light... lights) {
-        Assert.assertNotEquals("Incoming lights collection is empty", 0, lights.length);
-
-        for (Light light : lights) {
-            final String actualColor = _bridgeWrapperHelper.getLightRBGColor(light.asLightID());
-
-            _errorCollector.checkThat(String.format("Colors are equal, not expected=%s, actual %s", expectedColor, actualColor),
-                    actualColor, CoreMatchers.not(expectedColor));
-        }
+        expectColor(
+            (actualColor) -> !actualColor.equals(expectedColor),
+            (actualColor, timeout) -> _errorCollector.checkThat(String.format("Colors are equal, not expected=%s, actual %s, timeout %d ms", expectedColor, actualColor, timeout),
+                                      actualColor, CoreMatchers.not(expectedColor)),
+            lights);
     }
 
     @Test
+    @Ignore // see HSDK-2273
     public void simpleOverallAreaEffect() {
         final AreaEffect effect = new AreaEffect("simpleAreaEffect", 0);
         effect.AddArea(Area.getAll());
@@ -150,11 +161,11 @@ public class AnimationTests extends BaseTest {
         addEffectToEngine(effect);
         effect.Enable();
 
-        threadWaitFor(100);
         _allLights.forEach(light -> expectDifferentColor(RGB_BLACK, light));
     }
 
     @Test
+    @Ignore // see HSDK-2273
     public void twoAreaEffect() {
         final AreaEffect rearLeftPart = new AreaEffect("rearLeft", 1);
         rearLeftPart.AddArea(Area.getBackLeft());
@@ -171,12 +182,12 @@ public class AnimationTests extends BaseTest {
         rearLeftPart.Enable();
         frontRightPart.Enable();
 
-        threadWaitFor(200);
         expectDifferentColor(RGB_BLACK, _rearLeftLight, _frontRightLight);
         expectSameColor(RGB_BLACK, _rearRightLight, _frontLeftLight);
     }
 
     @Test
+    @Ignore // see HSDK-2273
     public void lightSourceEffect() {
         final LightSourceEffect effect = new LightSourceEffect();
         effect.SetColorAnimation(new ConstantAnimation(0.0)
@@ -188,12 +199,11 @@ public class AnimationTests extends BaseTest {
         addEffectToEngine(effect);
         effect.Enable();
 
-        threadWaitFor(100);
-
         _allLights.forEach(light -> expectDifferentColor(RGB_BLACK, light));
     }
 
     @Test
+    @Ignore // see HSDK-2273
     public void lightIteratorEffect() {
         int OFFSET_DIRATION = 1000;
 
@@ -210,7 +220,6 @@ public class AnimationTests extends BaseTest {
         addEffectToEngine(effect);
         effect.Enable();
 
-        threadWaitFor(100);
         expectDifferentColor(RGB_BLACK, _rearRightLight);
         expectSameColor(RGB_BLACK, _frontRightLight, _frontLeftLight, _rearLeftLight);
 
@@ -229,6 +238,7 @@ public class AnimationTests extends BaseTest {
     }
 
     @Test
+    @Ignore // see HSDK-2273
     public void manualEffect() {
         final ManualEffect effect = new ManualEffect();
 
@@ -239,8 +249,6 @@ public class AnimationTests extends BaseTest {
 
         addEffectToEngine(effect);
         effect.Enable();
-
-        threadWaitFor(100);
 
         _allLights.forEach(light -> expectDifferentColor(RGB_BLACK, light));
     }

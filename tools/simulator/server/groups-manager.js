@@ -62,6 +62,14 @@ function GroupsManager() {
         groupConfig[groupId].stream.owner = owner;
         saveGroupConfig();
     }
+    
+    that.getActive = function(groupId) {
+        return groupConfig[groupId].stream.active;
+    }
+
+    that.getOwner = function(groupId) {
+        return groupConfig[groupId].stream.owner;
+    }
 
     that.clearActive = function(owner) {
         for (var groupId in groupConfig) {
@@ -73,6 +81,17 @@ function GroupsManager() {
         }
         saveGroupConfig();
     }
+    
+    that.isActive = function(owner) {
+        for (var groupId in groupConfig) {
+            var group = groupConfig[groupId];
+            if (group.stream.active && group.stream.owner === owner) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
     function getFreeId(groupId) {
         var sorted = groupConfig[groupId].lights.sort(function(a, b){return a-b});
         for (var i = 1; i < 63; i++) {

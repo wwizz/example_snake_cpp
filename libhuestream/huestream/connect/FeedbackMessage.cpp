@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -37,6 +37,8 @@ std::map<FeedbackMessage::Id, FeedbackMessage::FeedbackType> FeedbackMessage::id
     {ID_PRESS_PUSH_LINK,                        FEEDBACK_TYPE_USER},
     {ID_FINISH_AUTHORIZING_AUTHORIZED,          FEEDBACK_TYPE_INFO},
     {ID_FINISH_AUTHORIZING_FAILED,              FEEDBACK_TYPE_INFO},
+    {ID_START_RETRIEVING_SMALL,                 FEEDBACK_TYPE_INFO},
+    {ID_FINISH_RETRIEVING_SMALL,                FEEDBACK_TYPE_INFO},
     {ID_START_RETRIEVING,                       FEEDBACK_TYPE_INFO},
     {ID_FINISH_RETRIEVING_FAILED,               FEEDBACK_TYPE_INFO},
     {ID_FINISH_RETRIEVING_READY_TO_START,       FEEDBACK_TYPE_INFO},
@@ -65,6 +67,7 @@ std::map<FeedbackMessage::Id, FeedbackMessage::FeedbackType> FeedbackMessage::id
     {ID_BRIDGE_DISCONNECTED,                    FEEDBACK_TYPE_INFO},
     {ID_STREAMING_CONNECTED,                    FEEDBACK_TYPE_INFO},
     {ID_STREAMING_DISCONNECTED,                 FEEDBACK_TYPE_USER},
+    {ID_BRIDGE_CHANGED,                         FEEDBACK_TYPE_INFO},
     {ID_LIGHTS_UPDATED,                         FEEDBACK_TYPE_INFO},
     {ID_GROUPLIST_UPDATED,                      FEEDBACK_TYPE_INFO},
     {ID_GROUP_LIGHTSTATE_UPDATED,               FEEDBACK_TYPE_INFO},
@@ -84,6 +87,8 @@ std::map<FeedbackMessage::Id, std::string> FeedbackMessage::idTagMap = {
     {ID_PRESS_PUSH_LINK,                        "ID_PRESS_PUSH_LINK"},
     {ID_FINISH_AUTHORIZING_AUTHORIZED,          "ID_FINISH_AUTHORIZING_AUTHORIZED"},
     {ID_FINISH_AUTHORIZING_FAILED,              "ID_FINISH_AUTHORIZING_FAILED"},
+    {ID_START_RETRIEVING_SMALL,                 "ID_START_RETRIEVING_SMALL"},
+    {ID_FINISH_RETRIEVING_SMALL,                "ID_FINISH_RETRIEVING_SMALL"},
     {ID_START_RETRIEVING,                       "ID_START_RETRIEVING"},
     {ID_FINISH_RETRIEVING_FAILED,               "ID_FINISH_RETRIEVING_FAILED"},
     {ID_FINISH_RETRIEVING_READY_TO_START,       "ID_FINISH_RETRIEVING_READY_TO_START"},
@@ -112,6 +117,7 @@ std::map<FeedbackMessage::Id, std::string> FeedbackMessage::idTagMap = {
     {ID_BRIDGE_DISCONNECTED,                    "ID_BRIDGE_DISCONNECTED"},
     {ID_STREAMING_CONNECTED,                    "ID_STREAMING_CONNECTED"},
     {ID_STREAMING_DISCONNECTED,                 "ID_STREAMING_DISCONNECTED"},
+    {ID_BRIDGE_CHANGED,                         "ID_BRIDGE_CHANGED"},
     {ID_LIGHTS_UPDATED,                         "ID_LIGHTS_UPDATED"},
     {ID_GROUPLIST_UPDATED,                      "ID_GROUPLIST_UPDATED"},
     {ID_GROUP_LIGHTSTATE_UPDATED,               "ID_GROUP_LIGHTSTATE_UPDATED"},
@@ -124,6 +130,7 @@ std::map<FeedbackMessage::RequestType, std::string> FeedbackMessage::requestStri
     {REQUEST_TYPE_CONNECT,            "REQUEST_TYPE_CONNECT"},
     {REQUEST_TYPE_CONNECT_BACKGROUND, "REQUEST_TYPE_CONNECT_BACKGROUND"},
     {REQUEST_TYPE_CONNECT_IP,         "REQUEST_TYPE_CONNECT_IP"},
+    {REQUEST_TYPE_CONNECT_NEW,        "REQUEST_TYPE_CONNECT_NEW"},
     {REQUEST_TYPE_SET_MANUAL_BRIDGE,  "REQUEST_TYPE_SET_MANUAL_BRIDGE"},
     {REQUEST_TYPE_RESET_BRIDGE,       "REQUEST_TYPE_RESET_BRIDGE"},
     {REQUEST_TYPE_RESET_ALL,          "REQUEST_TYPE_RESET_ALL"},
@@ -160,10 +167,10 @@ std::string FeedbackMessage::GetUserMessage() const {
         auto numBridges = GetBridgeList()->size();
         userMessage = std::to_string(numBridges) + " Hue Bridge" + (numBridges == 1 ? "" : "s") + userMessage;
     }
-    auto groupOwnerByOtherClient = _bridge->GetGroupOwnedByOtherClient();
-    if (_id == ID_BUSY_STREAMING && groupOwnerByOtherClient != nullptr) {
-        userMessage = userMessage + groupOwnerByOtherClient->GetFriendlyOwnerName() + " (" +
-            groupOwnerByOtherClient->GetName() + ").";
+    auto groupsOwnedByOtherClient = _bridge->GetGroupsOwnedByOtherClient();
+    if (_id == ID_BUSY_STREAMING && groupsOwnedByOtherClient->size() > 0) {
+        userMessage = userMessage + groupsOwnedByOtherClient->at(0)->GetFriendlyOwnerName() + " - " +
+            groupsOwnedByOtherClient->at(0)->GetName() + ".";
     }
     return userMessage;
 }

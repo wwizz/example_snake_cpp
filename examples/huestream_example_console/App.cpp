@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -24,7 +24,7 @@ using std::string;
 #define STREAMING_MODE_UDP_STRING "udp"
 #define STREAMING_MODE_DTLS_STRING "dtls"
 
-App::App(const string &_name, const string &_platform) : _name(_name), _platform(_platform) {}
+App::App(const string &_appName, const string &_deviceName) : _appName(_appName), _deviceName(_deviceName) {}
 
 void App::Main(int argc, char **argv) {
     ParseArguments(argc, argv);
@@ -53,7 +53,7 @@ void App::ConnectToBridge() {
 }
 
 void App::ParseArguments(int argc, char *const *argv) {
-    std::cout << "Entertainment Example: " << _name << std::endl;
+    std::cout << "Entertainment Example: " << _appName << std::endl;
     std::cout << "Build: " << BUILD_INFO << std::endl;
 
     _command.isValid = true;
@@ -104,7 +104,7 @@ bool App::ArgumentHasValue(const char *argument, const char *value) const {
 
 void App::PrintTutorialAndExit() const {
     cout << "Usage: " << endl;
-    cout << _name << " [bridge-connect-mode] [bridge-connect-mode-args] [streaming-mode]" << endl;
+    cout << _appName << " [bridge-connect-mode] [bridge-connect-mode-args] [streaming-mode]" << endl;
     cout << "    where bridge-connect-mode is:" << endl;
     cout << "      * " << CONNECTION_MODE_AUTO_STRING << endl;
     cout << "        search bridge and/or connect with (last used) bridge" << endl;
@@ -193,7 +193,7 @@ void App::ExecuteConnectionModeReset() const {
 }
 
 void App::InitializeHueStream() {
-    auto config = make_shared<huestream::Config>(_name, _platform);
+    auto config = make_shared<huestream::Config>(_appName, _deviceName);
     cout << "Initializing with streaming mode ";
     config->SetStreamingMode(_command.streamingMode);
     switch (_command.streamingMode) {

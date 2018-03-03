@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -45,21 +45,21 @@ namespace huestream {
         return false;
     }
 
-    void Player::BindAnimation(AnimationPtr animation) const {
-        animation->Rewind();
-        if (!AnimationIsBound(animation)) {
-            _animations->push_back(animation);
+    void Player::RewindNewAnimations(AnimationListPtr animations) const {
+        for (auto &animation : *animations) {
+            if (!AnimationIsBound(animation)) {
+                animation->Rewind();
+            }
         }
     }
 
     void Player::BindAnimations(AnimationListPtr animations) const {
-        for (auto &animation : *animations) {
-            BindAnimation(animation);
-        }
+        RewindNewAnimations(animations);
+        *_animations = *animations;
     }
 
     void Player::Start() {
-        auto timeProvider = TimeProviderProvider::Get();
+        auto timeProvider = TimeProviderProvider::get();
         auto diffTs = timeProvider->Now() - _oldTs;
         _timeStampWithSpeedCorrection += llround(diffTs * _speed);
         _oldTs = timeProvider->Now();
@@ -82,7 +82,7 @@ namespace huestream {
     }
 
     void Player::UpdateMarkers() {
-        auto timeProvider = TimeProviderProvider::Get();
+        auto timeProvider = TimeProviderProvider::get();
         auto diffTs = timeProvider->Now() - _oldTs;
         _timeStampWithSpeedCorrection += llround(diffTs * _speed);
         _oldTs = timeProvider->Now();

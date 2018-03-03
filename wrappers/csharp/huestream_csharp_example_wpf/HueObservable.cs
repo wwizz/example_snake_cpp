@@ -140,7 +140,7 @@ namespace HueStreamExampleWPF
         {
             RaisePropertyChangedEvent("IpAddress");
             RaisePropertyChangedEvent("User");
-            RaisePropertyChangedEvent("DeviceType");
+            RaisePropertyChangedEvent("ModelId");
         }
 
         

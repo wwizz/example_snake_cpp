@@ -1,5 +1,5 @@
 /*******************************************************************************
-Copyright (C) 2017 Philips Lighting Holding B.V.
+Copyright (C) 2018 Philips Lighting Holding B.V.
 All Rights Reserved.
 ********************************************************************************/
 
@@ -14,6 +14,8 @@ namespace huestream {
 
     class IConnectionMonitor {
     public:
+        virtual ~IConnectionMonitor() = default;
+
         virtual void Start(BridgePtr bridge, int interval_msec) = 0;
         virtual void Stop() = 0;
         virtual void SetFeedbackMessageCallback(std::function<void(const huestream::FeedbackMessage &)> callback) = 0;

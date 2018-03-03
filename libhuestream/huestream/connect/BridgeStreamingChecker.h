@@ -1,5 +1,5 @@
 /*******************************************************************************
-Copyright (C) 2017 Philips Lighting Holding B.V.
+Copyright (C) 2018 Philips Lighting Holding B.V.
 All Rights Reserved.
 ********************************************************************************/
 
@@ -22,12 +22,9 @@ private:
     FullConfigRetrieverPtr _fullConfigRetrieverPtr;
 
     std::function<void(const huestream::FeedbackMessage &)> _messageCallback;
-    bool IsPositionLightUpdated(const Location &expectedLightPosition, const Location &actualLightPosition);
-    bool IsLightUpdated(LightPtr expectedLight, LightPtr actualLight);
-    bool AreLightsUpdated(LightListPtr expectedLights, LightListPtr actualLights);
-    bool AreGroupsUpdated(GroupListPtr expectedGroups, GroupListPtr actualGroups);
-    bool IsHomeAutomationStateUpdated(GroupPtr expectedGroup, GroupPtr actualGroup);
 };
+
+std::vector<FeedbackMessage::Id> CompareBridges(BridgePtr oldBridge, BridgePtr newBridge);
 
 }  // namespace huestream
 

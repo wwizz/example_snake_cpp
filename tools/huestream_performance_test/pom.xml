@@ -32,7 +32,7 @@
 
 
 	<scm>
-		<connection>scm:git:https://github.com/PhilipsHueDev/Cpp-SDK-Feasibility.git</connection>
+		<connection>scm:git:ssh://git@origin.www.code.dtf.lighting.com:7999/hsdk/sdk.git</connection>
 	</scm>
 
 	<build>

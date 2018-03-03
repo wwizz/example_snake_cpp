@@ -1,12 +1,12 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
 #include <huestream_example_gui_win/stdafx.h>
 #include <huestream_example_gui_win/StreamTest.h>
 #include <huestream_example_gui_win/StreamTestDlg.h>
-#include <logging/Log.h>
+#include <support/logging/Log.h>
 #include <huestream/config/Config.h>
 #include <huestream/HueStream.h>
 #include <huestream/effect/animation/animations/CurveAnimation.h>
@@ -49,13 +49,19 @@ class CAboutDlg : public CDialogEx {
 
     BOOL OnInitDialog() override;
 
-    afx_msg void OnBnClickedButtonUDP();
+    afx_msg void OnBnClickedNewbridge();
+    afx_msg void OnComboChangedBridge();
 
+    afx_msg void OnBnClickedButtonUDP();
     afx_msg void OnBnClickedButtonDTLS();
+
+    afx_msg void OnBnClickedButtonON();
+    afx_msg void OnBnClickedButtonOFF();
 
     DECLARE_MESSAGE_MAP()
     HueStreamPtr m_huestream;
     CStreamTestDlg* m_mainDialog;
+    BridgeListPtr m_bridges;
 
  public:
     void SetHueStream(HueStreamPtr huestream) {
@@ -76,9 +82,12 @@ void CAboutDlg::DoDataExchange(CDataExchange *pDX) {
 
 BEGIN_MESSAGE_MAP(CAboutDlg, CDialogEx
 )
-ON_BN_CLICKED(ID_UDP, &CAboutDlg::OnBnClickedButtonUDP)
-ON_BN_CLICKED(ID_DTLS, &CAboutDlg::OnBnClickedButtonDTLS)
-
+ON_BN_CLICKED(IDC_UDP, &CAboutDlg::OnBnClickedButtonUDP)
+ON_BN_CLICKED(IDC_DTLS, &CAboutDlg::OnBnClickedButtonDTLS)
+ON_BN_CLICKED(IDC_ON, &CAboutDlg::OnBnClickedButtonON)
+ON_BN_CLICKED(IDC_OFF, &CAboutDlg::OnBnClickedButtonOFF)
+ON_BN_CLICKED(IDC_NEWBRIDGE, &CAboutDlg::OnBnClickedNewbridge)
+ON_CBN_SELENDOK(IDC_COMBO_BRIDGES, &CAboutDlg::OnComboChangedBridge)
 END_MESSAGE_MAP()
 
 BOOL CAboutDlg::OnInitDialog() {
@@ -123,6 +132,16 @@ BOOL CAboutDlg::OnInitDialog() {
     }
     connectResultField->SetWindowText(resultString.c_str());
 
+    m_bridges = m_huestream->GetKnownBridges();
+    auto combo_bridges = (CComboBox*)GetDlgItem(IDC_COMBO_BRIDGES);
+    combo_bridges->ResetContent();
+    for (auto b = m_bridges->begin(); b != m_bridges->end(); ++b) {
+        auto idx = combo_bridges->AddString((*b)->GetName().c_str());
+        if ((*b)->GetId() == m_huestream->GetLoadedBridge()->GetId()) {
+            combo_bridges->SetCurSel(idx);
+        }
+    }
+
     return TRUE;
 }
 
@@ -132,6 +151,29 @@ void CAboutDlg::OnBnClickedButtonUDP() {
 
 void CAboutDlg::OnBnClickedButtonDTLS() {
     m_mainDialog->ChangeMode(false);
+}
+
+void CAboutDlg::OnBnClickedButtonON() {
+    m_mainDialog->GetHueStream()->SetGroupOn(true);
+}
+
+void CAboutDlg::OnBnClickedButtonOFF() {
+    m_mainDialog->GetHueStream()->SetGroupOn(false);
+}
+
+void CAboutDlg::OnBnClickedNewbridge() {
+    m_mainDialog->GetHueStream()->ConnectNewBridgeAsync();
+}
+
+void CAboutDlg::OnComboChangedBridge() {
+    auto combo_bridges = (CComboBox*)GetDlgItem(IDC_COMBO_BRIDGES);
+    auto sel = combo_bridges->GetCurSel();
+    if (sel >= 0 && sel < m_bridges->size()) {
+        auto newBridge = m_bridges->at(sel);
+        if (newBridge->GetId() != m_huestream->GetLoadedBridge()->GetId()) {
+            m_huestream->ConnectManualBridgeInfoAsync(newBridge);
+        }
+    }
 }
 
 CStreamTestDlg::CStreamTestDlg(CWnd *pParent /*=NULL*/)
@@ -305,10 +347,16 @@ bool CStreamTestDlg::IsUDPForcedByCommandLine() {
     return (args.size() == 2 && args.at(1) == "udp");
 }
 
+const std::string CStreamTestDlg::GetDeviceName() const {
+    TCHAR computerName[MAX_COMPUTERNAME_LENGTH + 1];
+    DWORD size = sizeof(computerName) / sizeof(computerName[0]);
+    GetComputerName(computerName, &size);
+    return std::string(computerName);
+}
+
 void CStreamTestDlg::InitializeHueStream(bool useUDP, const std::string language) {
-    const std::string appName = "StreamTest";
-    const std::string platform = "PC";
-    auto config = std::make_shared<huestream::Config>(appName, platform, language);
+    const std::string applicationName = "HueStreamGUI Windows";
+    auto config = std::make_shared<huestream::Config>(applicationName, GetDeviceName(), language);
     if (useUDP) {
         AddDebugMsg("Initialized with UDP");
         config->SetStreamingMode(huestream::STREAMING_MODE_UDP);
@@ -316,6 +364,8 @@ void CStreamTestDlg::InitializeHueStream(bool useUDP, const std::string language
         AddDebugMsg("Initialized with default configuration");
         config->SetStreamingMode(huestream::STREAMING_MODE_DTLS);
     }
+    //Choose whether to start streaming immediately at bridge connection (default true)
+    //config->GetAppSettings()->SetAutoStartAtConnection(false);
 
     //  Create HueStream instance ...
     m_huestream = std::make_shared<huestream::HueStream>(config);
@@ -363,31 +413,21 @@ LRESULT CStreamTestDlg::OnHuestreamFeedback(WPARAM wParam, LPARAM lParam)
         SetUserMessage(message->GetUserMessage());
     }
 
-    if (message->GetId() == huestream::FeedbackMessage::ID_DONE_COMPLETED || message->GetId() == huestream::FeedbackMessage::ID_DONE_ACTION_REQUIRED) {
+    if (message->GetId() == huestream::FeedbackMessage::ID_DONE_BRIDGE_FOUND) {
+        SetUserMessage(
+            "It looks like you've got a Hue bridge and guess what: this app works with Hue! Press connect if you want to connect.");
+    }
+
+    if (message->GetId() == huestream::FeedbackMessage::ID_DONE_COMPLETED) {
+        SetUserMessage("Connected to Hue bridge!");
+    }
+
+    if (message->GetId() == huestream::FeedbackMessage::ID_BRIDGE_CHANGED) {
         SetIpAndCredentials(
             message->GetBridge()->GetIpAddress().c_str(),
             message->GetBridge()->GetUser().c_str(),
             message->GetBridge()->GetClientKey().c_str()
         );
-        SetGroups(message->GetBridge());
-
-        if (message->GetId() == huestream::FeedbackMessage::ID_DONE_COMPLETED) {
-            if (m_huestream->GetConfig()->GetAppSettings()->GetLanguage() == "nl") {
-                SetUserMessage("Verbonden met Hue bridge!");
-            } else {
-                SetUserMessage("Connected to Hue bridge!");
-            }
-        }
-    }
-
-    if (message->GetId() == huestream::FeedbackMessage::ID_DONE_BRIDGE_FOUND) {
-        if (m_huestream->GetConfig()->GetAppSettings()->GetLanguage() == "nl") {
-            SetUserMessage(
-                "Zo te zien heb je een Hue bridge en dat is mooi want deze app werkt met Hue! Druk op connect als je wilt verbinden.");
-        } else {
-            SetUserMessage(
-                "It looks like you've got a Hue bridge and guess what: this app works with Hue! Press connect if you want to connect.");
-        }
     }
 
     if (message->GetId() == huestream::FeedbackMessage::ID_USERPROCEDURE_STARTED ||
@@ -396,25 +436,26 @@ LRESULT CStreamTestDlg::OnHuestreamFeedback(WPARAM wParam, LPARAM lParam)
         SetConnectButtonText();
     }
 
-    if (message->GetId() == huestream::FeedbackMessage::ID_LIGHTS_UPDATED ||
-        message->GetId() == huestream::FeedbackMessage::ID_DONE_RESET) {
-        ClearLights();
-    }
-
     if (message->GetId() == huestream::FeedbackMessage::ID_GROUPLIST_UPDATED) {
         SetGroups(message->GetBridge());
     }
 
-    if (message->GetId() == huestream::FeedbackMessage::ID_STREAMING_CONNECTED) {
+    if (message->GetId() == huestream::FeedbackMessage::ID_LIGHTS_UPDATED) {
         ClearLights();
+        DrawLights();
+    }
+
+    if (message->GetId() == huestream::FeedbackMessage::ID_STREAMING_CONNECTED) {
         StartRenderLightsOnUI();
+        m_effectPlayer->Start();
+        if (message->GetBridge()->IsProxyNodeUnreachable()) {
+            AddDebugMsg("(Warning: communicator unreachable)");
+        }
     }
 
     if (message->GetId() == huestream::FeedbackMessage::ID_STREAMING_DISCONNECTED) {
+        m_effectPlayer->Stop();
         StopRenderLightsOnUI();
-        if (!message->GetBridge()->IsValidGroupSelected()) {
-            ClearLights();
-        }
     }
     
     delete message;
@@ -440,6 +481,10 @@ void CStreamTestDlg::ChangeMode(bool useUDP) {
     InitializeEffectPlayerAndTimeline();
 }
 
+HueStreamPtr CStreamTestDlg::GetHueStream() {
+    return m_huestream;
+}
+
 void CStreamTestDlg::OnBnClickedButtonConnect() {
     switch (m_huestream->GetConnectionResult()) {
     case huestream::Busy:
@@ -453,10 +498,10 @@ void CStreamTestDlg::OnBnClickedButtonConnect() {
         break;
     case huestream::ActionRequired:
     case huestream::ReadyToStart: 
-        m_effectPlayer->Start();
+        m_huestream->StartAsync();
         break;
     case huestream::Streaming:
-        m_effectPlayer->Stop();
+        m_huestream->StopAsync();
         break;
     default: 
         break;
@@ -516,9 +561,6 @@ void CStreamTestDlg::DrawLights() {
     pWnd->GetWindowRect(&rect);
     ScreenToClient(&rect);
 
-    auto group = m_huestream->GetLoadedBridge()->GetGroup();
-    if (group == nullptr)
-        return;
     const auto circleSize = 10;
     const auto topAdjustment = 3;
     auto centerX = rect.CenterPoint().x;
@@ -526,7 +568,9 @@ void CStreamTestDlg::DrawLights() {
     auto verticalAdjust = -1 * ((rect.Height() / 2) - topAdjustment - circleSize);
     auto horizontalAdjust = (rect.Width() / 2) - circleSize;
 
-    for (auto l = group->GetLights()->begin(); l != group->GetLights()->end(); ++l) {
+    auto lights = m_huestream->GetLoadedBridge()->GetGroupLights();
+
+    for (auto l = lights->begin(); l != lights->end(); ++l) {
         auto color = (*l)->GetColor();
         color.Clamp();
         auto r = color.GetR();
@@ -641,7 +685,6 @@ void CStreamTestDlg::OnBnClickedButtonReset() {
     SetIpAndCredentials("", "", "");
     SetUserMessage("");
     m_combo_group.ResetContent();
-    m_effectPlayer->Stop();
     m_huestream->ResetBridgeInfoAsync();
 }
 
@@ -949,56 +992,7 @@ std::vector<std::string> CStreamTestDlg::split(const std::string &s, char delim)
 }
 
 void CStreamTestDlg::OnBnClickedSave() {
-    auto zero = std::make_shared<huestream::ConstantAnimation>(0);
-    auto points = std::make_shared<huestream::PointList>();
-    points->push_back(std::make_shared<huestream::Point>(0, 0));
-    points->push_back(std::make_shared<huestream::Point>(1000, 1));
-    points->push_back(std::make_shared<huestream::Point>(2000, 0));
-    auto sawAnimationTriple = std::make_shared<huestream::CurveAnimation>(2, points);
-    auto sawAnimationInf = std::make_shared<huestream::CurveAnimation>(huestream::INF, points);
-
-    auto redEffect = std::make_shared<huestream::AreaEffect>("redLeft", 0);
-    redEffect->SetArea(huestream::Area::Left);
-    redEffect->SetColorAnimation(sawAnimationTriple, zero, zero);
-    auto redAction = std::make_shared<huestream::Action>("redat0", 0, redEffect, 0);
-
-    auto blueEffect = std::make_shared<huestream::AreaEffect>("blueRight", 0);
-    blueEffect->SetArea(huestream::Area::RightHalf);
-    blueEffect->SetColorAnimation(zero, zero, sawAnimationInf);
-    auto blueAction = std::make_shared<huestream::Action>("blue3to12", 0, blueEffect, 3000, 16000);
-
-    auto explosionEffect = std::make_shared<huestream::LightSourceEffect>("explosion", 1);
-    huestream::Color color(1, 0.7, 0.3);
-    explosionEffect->SetFixedColor(color);
-    explosionEffect->SetPositionAnimation(std::make_shared<huestream::ConstantAnimation>(0), std::make_shared<huestream::ConstantAnimation>(0));
-    auto radiusAnimation = std::make_shared<huestream::SequenceAnimation>(0);
-    auto fastUp = std::make_shared<huestream::TweenAnimation>(0, 2.2, 500, huestream::TweenType::Linear);
-    auto slowDown = std::make_shared<huestream::TweenAnimation>(2.2, 0, 2000, huestream::TweenType::EaseInOutQuad);
-    radiusAnimation->Append(fastUp, "FastUp");
-    radiusAnimation->Append(slowDown, "SlowDown");
-    explosionEffect->SetRadiusAnimation(radiusAnimation);
-    auto alphaAnimation = std::make_shared<huestream::SequenceAnimation>(0);
-    alphaAnimation->Append(std::make_shared<huestream::TweenAnimation>(0.5, 1, 200, huestream::TweenType::Linear));
-    alphaAnimation->Append(std::make_shared<huestream::TweenAnimation>(1, 1, 1500, huestream::TweenType::Linear));
-    alphaAnimation->Append(std::make_shared<huestream::TweenAnimation>(1, 0, 800, huestream::TweenType::EaseInOutQuad));
-    explosionEffect->SetOpacityAnimation(alphaAnimation);
-    auto explosionAction = std::make_shared<huestream::Action>("explosionAt5", 1, explosionEffect, 5000);
-
-    auto marqueeEffect = std::make_shared<huestream::LightpointMarqueeEffect>("marquee", 1);
-    marqueeEffect->PrepareEffect(std::make_shared<huestream::ConstantAnimation>(1), std::make_shared<huestream::ConstantAnimation>(1));
-    marqueeEffect->SetOpacityBoundToIntensity(true);
-    auto marqueeAction = std::make_shared<huestream::Action>("marqueeAt10", 1, marqueeEffect, 10000, 19000);
-
-    auto lightscript = std::make_shared<huestream::LightScript>("testscript", 20000);
-    auto locations = std::make_shared<huestream::LocationList>();
-    locations->push_back(std::make_shared<huestream::Location>(-1, 0));
-    locations->push_back(std::make_shared<huestream::Location>(0, 0));
-    locations->push_back(std::make_shared<huestream::Location>(1, 0));
-    lightscript->SetIdealSetup(locations);
-    lightscript->AddAction(redAction);
-    lightscript->AddAction(blueAction);
-    lightscript->AddAction(explosionAction);
-    lightscript->AddAction(marqueeAction);
+    auto lightscript = CreateExampleScript();
 
     TCHAR szFilters[] = _T("JSON Files (*.json)|*.json|All Files (*.*)|*.*||");
 
@@ -1057,6 +1051,61 @@ void CStreamTestDlg::OnBnClickedPlay() {
 void CStreamTestDlg::OnBnClickedStop() {
     m_timeline->Stop();
     GetDlgItem(IDC_PLAY)->SetWindowText("Play");
+}
+
+LightScriptPtr CStreamTestDlg::CreateExampleScript() {
+    auto zero = std::make_shared<huestream::ConstantAnimation>(0);
+    auto points = std::make_shared<huestream::PointList>();
+    points->push_back(std::make_shared<huestream::Point>(0, 0));
+    points->push_back(std::make_shared<huestream::Point>(1000, 1));
+    points->push_back(std::make_shared<huestream::Point>(2000, 0));
+    auto sawAnimationTriple = std::make_shared<huestream::CurveAnimation>(2, points);
+    auto sawAnimationInf = std::make_shared<huestream::CurveAnimation>(huestream::INF, points);
+
+    auto redEffect = std::make_shared<huestream::AreaEffect>("redLeft", 0);
+    redEffect->SetArea(huestream::Area::Left);
+    redEffect->SetColorAnimation(sawAnimationTriple, zero, zero);
+    auto redAction = std::make_shared<huestream::Action>("redat0", 0, redEffect, 0);
+
+    auto blueEffect = std::make_shared<huestream::AreaEffect>("blueRight", 0);
+    blueEffect->SetArea(huestream::Area::RightHalf);
+    blueEffect->SetColorAnimation(zero, zero, sawAnimationInf);
+    auto blueAction = std::make_shared<huestream::Action>("blue3to12", 0, blueEffect, 3000, 16000);
+
+    auto explosionEffect = std::make_shared<huestream::LightSourceEffect>("explosion", 1);
+    huestream::Color color(1, 0.7, 0.3);
+    explosionEffect->SetFixedColor(color);
+    explosionEffect->SetPositionAnimation(std::make_shared<huestream::ConstantAnimation>(0), std::make_shared<huestream::ConstantAnimation>(0));
+    auto radiusAnimation = std::make_shared<huestream::SequenceAnimation>(0);
+    auto fastUp = std::make_shared<huestream::TweenAnimation>(0, 2.2, 500, huestream::TweenType::Linear);
+    auto slowDown = std::make_shared<huestream::TweenAnimation>(2.2, 0, 2000, huestream::TweenType::EaseInOutQuad);
+    radiusAnimation->Append(fastUp, "FastUp");
+    radiusAnimation->Append(slowDown, "SlowDown");
+    explosionEffect->SetRadiusAnimation(radiusAnimation);
+    auto alphaAnimation = std::make_shared<huestream::SequenceAnimation>(0);
+    alphaAnimation->Append(std::make_shared<huestream::TweenAnimation>(0.5, 1, 200, huestream::TweenType::Linear));
+    alphaAnimation->Append(std::make_shared<huestream::TweenAnimation>(1, 1, 1500, huestream::TweenType::Linear));
+    alphaAnimation->Append(std::make_shared<huestream::TweenAnimation>(1, 0, 800, huestream::TweenType::EaseInOutQuad));
+    explosionEffect->SetOpacityAnimation(alphaAnimation);
+    auto explosionAction = std::make_shared<huestream::Action>("explosionAt5", 1, explosionEffect, 5000);
+
+    auto marqueeEffect = std::make_shared<huestream::LightpointMarqueeEffect>("marquee", 1);
+    marqueeEffect->PrepareEffect(std::make_shared<huestream::ConstantAnimation>(1), std::make_shared<huestream::ConstantAnimation>(1));
+    marqueeEffect->SetOpacityBoundToIntensity(true);
+    auto marqueeAction = std::make_shared<huestream::Action>("marqueeAt10", 1, marqueeEffect, 10000, 19000);
+
+    auto lightscript = std::make_shared<huestream::LightScript>("testscript", 20000);
+    auto locations = std::make_shared<huestream::LocationList>();
+    locations->push_back(std::make_shared<huestream::Location>(-1, 0));
+    locations->push_back(std::make_shared<huestream::Location>(0, 0));
+    locations->push_back(std::make_shared<huestream::Location>(1, 0));
+    lightscript->SetIdealSetup(locations);
+    lightscript->AddAction(redAction);
+    lightscript->AddAction(blueAction);
+    lightscript->AddAction(explosionAction);
+    lightscript->AddAction(marqueeAction);
+
+    return lightscript;
 }
 
 std::string CStreamTestDlg::GetLanguage() const {

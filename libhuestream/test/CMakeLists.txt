@@ -41,11 +41,14 @@ if (BUILD_TEST_COV)
             WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
             )
 
-    set(cpplint_dir ${CMAKE_CURRENT_LIST_DIR}/../../tools/cpplint)
+    include(ExternalCpplint)
+    add_dependencies(huestream_tests ${EXTERNAL_CPPLINT})
+    set(LINT_RUNNER_DIR ${CMAKE_CURRENT_LIST_DIR}/../../tools/cpplint)
+
     add_custom_command(TARGET ${coverage_project_name}
-            COMMENT "Running cpplint: ${cppline_dir}/lint_edk.sh"
-            POST_BUILD COMMAND ./lint_edk.sh
-            WORKING_DIRECTORY ${cpplint_dir}
+            COMMENT "Launching cpplint runner: ${LINT_RUNNER_DIR}/lint_edk.sh"
+            POST_BUILD COMMAND ./lint_edk.sh ${CPPLINT_EXECUTABLE}
+            WORKING_DIRECTORY ${LINT_RUNNER_DIR}
             )
 endif()
 

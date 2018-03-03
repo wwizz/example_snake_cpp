@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -45,7 +45,7 @@ namespace huestream {
             Running, Stopping, Stopped
         } _state;
 
-        void BindAnimation(AnimationPtr animation) const;
+        void RewindNewAnimations(AnimationListPtr animations) const;
         double getNowFromStartPosition() const;
         bool AnimationIsBound(AnimationPtr animation) const;
     };

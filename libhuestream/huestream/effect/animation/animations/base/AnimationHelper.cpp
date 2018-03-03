@@ -1,5 +1,5 @@
 /*******************************************************************************
-Copyright (C) 2017 Philips Lighting Holding B.V.
+Copyright (C) 2018 Philips Lighting Holding B.V.
 All Rights Reserved.
 ********************************************************************************/
 
@@ -13,6 +13,12 @@ AnimationListPtr AnimationHelper::CreatePtr(AnimationPtr p1) {
     return list;
 }
 
+AnimationListPtr AnimationHelper::CreatePtr(AnimationPtr p1, AnimationPtr p2) {
+    auto list = std::make_shared<AnimationList>();
+    list->push_back(p1);
+    list->push_back(p2);
+    return list;
+}
 
 AnimationListPtr AnimationHelper::CreatePtr(AnimationPtr p1, AnimationPtr p2, AnimationPtr p3, AnimationPtr p4) {
     auto list = std::make_shared<AnimationList>();

@@ -1,10 +1,10 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
 #include <huestream_example_console/Terminal.h>
-#include <logging/Log.h>
+#include <support/logging/Log.h>
 #include <huestream/config/Config.h>
 #include <huestream/HueStream.h>
 #include <huestream_example_console/App.h>
@@ -23,7 +23,7 @@ using std::endl;
 
 class ConnectionFlowExample : public App {
 public:
-    ConnectionFlowExample() : App("Example_Effect", "PC") {}
+    ConnectionFlowExample() : App("HueConsoleExample", "PC") {}
 
     void StartExample() override {
         MainMenu();

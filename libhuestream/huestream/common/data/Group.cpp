@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -8,12 +8,14 @@
 #include <iostream>
 #include <string>
 #include <map>
+#include <iostream>
+#include <sstream>
 
 namespace huestream {
 
     const std::map<GroupClass, std::string> Group::_classSerializeMap = {
-        { GROUPCLASS_TV, "tv" },
-        { GROUPCLASS_FREE,  "free" },
+        { GROUPCLASS_TV,    "tv"    },
+        { GROUPCLASS_FREE,  "free"  },
         { GROUPCLASS_OTHER, "other" }
     };
 
@@ -23,13 +25,14 @@ namespace huestream {
     PROP_IMPL(Group, LightListPtr, lights, Lights);
     PROP_IMPL_BOOL(Group, bool, active, Active);
     PROP_IMPL(Group, std::string, owner, Owner);
-    PROP_IMPL(Group, std::string, friendlyOwnerName, FriendlyOwnerName);
+    PROP_IMPL(Group, std::string, ownerName, OwnerName);
+    PROP_IMPL(Group, GroupProxyNode, proxyNode, ProxyNode);
     PROP_IMPL(Group, SceneListPtr, scenes, Scenes);
     PROP_IMPL_BOOL(Group, bool, onState, OnState);
     PROP_IMPL(Group, double, brightnessState, BrightnessState);
 
     Group::Group() : _id(""), _name(""), _classType(GROUPCLASS_OTHER), _lights(std::make_shared<LightList>()), _active(false), _owner(""),
-                     _friendlyOwnerName(""), _scenes(std::make_shared<SceneList>()), _onState(true), _brightnessState(1.0) {
+        _ownerName(""), _proxyNode({"","","","",true}), _scenes(std::make_shared<SceneList>()), _onState(true), _brightnessState(1.0) {
     }
 
     Group::~Group() {
@@ -53,6 +56,34 @@ namespace huestream {
             }
         }
         _lights->push_back(std::make_shared<Light>(id, location, name, model, reachable));
+    }
+
+    std::string Group::GetFriendlyOwnerName() const {
+        auto appName = GetOwnerApplicationName();
+        auto deviceName = GetOwnerDeviceName();
+
+        std::ostringstream oss;
+        oss << appName;
+        if (!deviceName.empty()) {
+            oss << " (" << deviceName << ")";
+        }
+        return oss.str();
+    }
+
+    std::string Group::GetOwnerApplicationName() const {
+        auto splitOwner = Split(_ownerName, '#');
+        if (splitOwner.size() == 2 || splitOwner.size() == 1) {
+            return splitOwner.at(0);
+        }
+        return _ownerName;
+    }
+
+    std::string Group::GetOwnerDeviceName() const {
+        auto splitOwner = Split(_ownerName, '#');
+        if (splitOwner.size() == 2) {
+            return splitOwner.at(1);
+        }
+        return std::string("");
     }
 
     double Group::Clip(double value, double min, double max) const {
@@ -87,11 +118,8 @@ namespace huestream {
     }
 
     Group* Group::Clone() {
-        auto g = new Group();
-        g->_id = _id;
-        g->_name = _name;
-        g->_classType = _classType;
-        g->_lights = clone_list(_lights);
+        auto g = new Group(*this);
+        g->SetLights(clone_list(_lights));
         return g;
     }
 
@@ -108,7 +136,7 @@ namespace huestream {
         }
     }
 
-    void  Group::DeserializeClass(JSONNode *node) {
+    void Group::DeserializeClass(JSONNode *node) {
         std::string classString;
         DeserializeValue(node, AttributeClassType, &classString, "other");
 
@@ -120,6 +148,16 @@ namespace huestream {
                 break;
             }
         }
+    }
+
+    std::vector<std::string> Group::Split(const std::string& s, char delimiter) const {
+        std::vector<std::string> tokens;
+        std::string token;
+        std::istringstream tokenStream(s);
+        while (std::getline(tokenStream, token, delimiter)) {
+            tokens.push_back(token);
+        }
+        return tokens;
     }
 
 }  // namespace huestream

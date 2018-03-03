@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 #ifndef LIBHUESTREAM_TEST_MOCKTIMEMANAGER_H_
@@ -15,6 +15,26 @@ namespace huestream {
         MOCK_METHOD1(Sleep, void(int64_t duration));
         MOCK_METHOD0(Now, int64_t());
         MOCK_METHOD0(UpdateTime, void());
+    };
+
+    class MockWrapperTimeManager : public ITimeManager {
+    public:
+        explicit MockWrapperTimeManager(const std::shared_ptr<MockTimeManager>& mock)
+          : _mock(mock) {}
+
+        void Sleep(int64_t duration) {
+            _mock->Sleep(duration);
+        }
+
+        int64_t Now() {
+            return _mock->Now();
+        }
+
+        void UpdateTime() {
+            return _mock->UpdateTime();
+        }
+    private:
+        std::shared_ptr<MockTimeManager> _mock;
     };
 }
 

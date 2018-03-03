@@ -30,14 +30,20 @@ function SimulatorServer(app, express, streamsrv, io) {
         console.log(serverInfo.name + " " + serverInfo.version);
         console.log("\n-----------------------------------------\n");
     }
-
-    this.streamMessage = function(msg) {
+    
+    function streamTimeout() {
         clearTimeout(messageReceivedTimeout);
-        messageReceivedTimeout = setInterval(function () {
+        if (that.groups.isActive(USER)) {
             console.log("Closing streaming session due to inactivity for " + CLOSE_SESSION_TIME_MS / 1000 + " sec");
             that.groups.clearActive(USER);
+        }
+    }
+
+    this.streamMessage = function(msg) {
+        if (that.groups.isActive(USER)) {
             clearTimeout(messageReceivedTimeout);
-        }, CLOSE_SESSION_TIME_MS);
+            messageReceivedTimeout = setInterval(streamTimeout, CLOSE_SESSION_TIME_MS);
+        }
     }
 
     function init() {
@@ -81,12 +87,21 @@ function SimulatorServer(app, express, streamsrv, io) {
 
             console.log('PUT groups -- groupId: ' + groupId + ' stream.active: ' + active);
             res.setHeader('Content-Type', 'application/json');
-            res.send("[{\"success\":{\"/groups/" + groupId + "/stream/active\":" + active + "}}]");
-            that.groups.setActive(groupId, active)
+            
             if (active) {
-                that.groups.setOwner(groupId, USER);
+                if (!that.groups.getActive(groupId) || that.groups.getOwner(groupId) === USER) {
+                    res.send("[{\"success\":{\"/groups/" + groupId + "/stream/active\":" + active + "}}]");
+                    that.groups.setActive(groupId, active);
+                    that.groups.setOwner(groupId, USER);
+                    messageReceivedTimeout = setInterval(streamTimeout, CLOSE_SESSION_TIME_MS);
+                } else {
+                    res.send("[{\"error\":{\"type\":307,\"address\":\"/groups/" + groupId + "/stream/active\",\"description\":\"Cannot claim stream ownership\"}}]");
+                }
             } else {
+                res.send("[{\"success\":{\"/groups/" + groupId + "/stream/active\":" + active + "}}]");
+                that.groups.setActive(groupId, active);
                 that.groups.setOwner(groupId, null);
+                clearTimeout(messageReceivedTimeout);
             }
         });
 
@@ -107,6 +122,13 @@ function SimulatorServer(app, express, streamsrv, io) {
                 lights :  that.groups.getLights()
             };
             res.send(JSON.stringify(fullConfig));
+        });
+        
+        app.put('/api/*/groups/*/action', function (req, res) {
+            //console.log('simulator: group action');
+            //console.log(req.body);
+            res.setHeader('Content-Type', 'application/json');
+            res.send("");
         });
 
         app.put('/develop/groupconfig/:groupId/light', function (req, res) {
@@ -152,11 +174,15 @@ function SimulatorServer(app, express, streamsrv, io) {
             }
 
 
-            console.log("PUT ('/develop/groupconfig/\" + groupId + \"/state' ERROR active: " + active + ", owner: " + owner)
+            console.log("PUT ('/develop/groupconfig/" + groupId + "/state' active: " + active + ", owner: " + owner)
             if (active !== undefined) {
                 that.groups.setActive(groupId, active);
+                if (active && owner === USER) {
+                    messageReceivedTimeout = setInterval(streamTimeout, CLOSE_SESSION_TIME_MS);
+                } else {
+                    clearTimeout(messageReceivedTimeout);
+                }
             }
-
             if (owner !== undefined) {
                 that.groups.setOwner(groupId, owner);
             }

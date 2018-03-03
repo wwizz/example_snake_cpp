@@ -29,7 +29,7 @@ TEST_F(TestDefaultConnectionFlowFactory, GetFactory) {
                                                                   std::static_pointer_cast<IBridgeStorageAccessor>(accessor));
 
     ASSERT_NE(nullptr, factory->CreateAuthenticator());
-    ASSERT_NE(nullptr, factory->CreateFullConfigRetriever());
+    ASSERT_NE(nullptr, factory->CreateConfigRetriever());
     ASSERT_NE(nullptr, factory->CreateSearcher());
     ASSERT_NE(nullptr, factory->GetMessageDispatcher());
     ASSERT_NE(nullptr, factory->GetStorageAccesser());

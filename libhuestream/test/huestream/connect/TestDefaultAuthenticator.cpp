@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -58,7 +58,7 @@ class TestDefaultAuthenticator : public testing::Test {
     std::shared_ptr<Authenticator> _defaultAuthenticator;
     std::string _ip;
     std::string _appName;
-    std::string _platform;
+    std::string _deviceName;
     const std::string _id = "001788FFFE200646";
     const std::string _apiVersion = "1.22.0";
     const std::string _outdatedApiVersion = "1.18.0";
@@ -67,12 +67,12 @@ class TestDefaultAuthenticator : public testing::Test {
         _ip = "192.168.1.15";
         s_username = "testUser";
         s_clientkey = "DD129216F1A50E5D1C0CB356325745F2";
-        _appName = "AuthenticatorUnitTest";
-        _platform = "PC";
+        _appName = "AuthUnitTest";
+        _deviceName = "PC";
         _mockHttpPtr = std::make_shared<MockHttpClient>();
         _appSettings = std::make_shared<AppSettings>();
-        _appSettings->SetName(_appName);
-        _appSettings->SetPlatform(_platform);
+        _appSettings->SetAppName(_appName);
+        _appSettings->SetDeviceName(_deviceName);
         _bridgeSettings = std::make_shared<BridgeSettings>();
 
         _bridge = std::make_shared<Bridge>(_bridgeSettings);
@@ -99,12 +99,12 @@ class TestDefaultAuthenticator : public testing::Test {
 
     const std::string getAuthBodyWithClientKey() {
         const std::string body =
-            "{\"devicetype\": \"" + _appName + "#" + _platform + "\", \"generateclientkey\": true\n}";
+            "{\"devicetype\": \"" + _appName + "#" + _deviceName + "\", \"generateclientkey\": true\n}";
         return body;
     }
 
     const std::string getAuthBodyWithoutClientKey() {
-        const std::string body = "{\"devicetype\": \"" + _appName + "#" + _platform + "\"}";
+        const std::string body = "{\"devicetype\": \"" + _appName + "#" + _deviceName + "\"}";
         return body;
     }
 
@@ -207,6 +207,24 @@ TEST_F(TestDefaultAuthenticator, AuthenticateFailClientkeyNotAvailable) {
         ASSERT_THAT(b->IsAuthorized(), Eq(false));
         ASSERT_THAT(b->GetId(), Eq(_id));
         ASSERT_THAT(b->GetApiversion(), Eq("0.0.0"));
+    });
+}
+
+TEST_F(TestDefaultAuthenticator, AuthenticateSuccessCorrectedDeviceType) {
+    _appName = "thisisatoolong#applicationname";
+    _deviceName = "this#devicename#isalsotoolong";
+    _appSettings->SetAppName(_appName);
+    _appSettings->SetDeviceName(_deviceName);
+    const std::string body =
+        "{\"devicetype\": \"thisisatoolongapplic#thisdevicenameisals\", \"generateclientkey\": true\n}";
+
+    EXPECT_CALL(*_mockHttpPtr, Execute(MatchHttpRequest(HTTP_REQUEST_POST, getAuthUrl(),
+        body))).Times(1).WillOnce(Invoke(SetHttpAuthenticateResponseSuccess));
+
+    _defaultAuthenticator->Authenticate(_bridge, _appSettings, [this](BridgePtr b) {
+        checkBasicBridgeAttributes(b);
+        ASSERT_THAT(b->GetClientKey(), Eq(s_clientkey));
+        ASSERT_THAT(b->GetApiversion(), Eq(_apiVersion));
     });
 }
 

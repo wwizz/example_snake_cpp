@@ -16,7 +16,7 @@
 %module(directors="1") HueStreamWrapper
 %{
 #ifdef ANDROID
-#  include "jni/SDKSupportJNI.h"
+#  include "support/jni/SDKSupportJNI.h"
 #endif
 %}
 %{
@@ -24,7 +24,7 @@
 #ifdef ANDROID
 jint JNI_OnLoad(JavaVM* vm, void* reserved)
 {
-  huesdk_lib::jni::init(vm);
+  support::jni::init(vm);
   return JNI_VERSION_1_6;
 }
 #endif
@@ -135,6 +135,7 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved)
 %shared_ptr(std::vector<std::shared_ptr<huestream::Action>>)
 %shared_ptr(huestream::IConnector)
 %shared_ptr(huestream::UdpConnector)
+%shared_ptr(huestream::IHueStream)
 
 %shared_ptr(huestream::HueStream)
 
@@ -512,5 +513,6 @@ namespace huestream {
 %include <huestream/config/ObjectBuilder.h>
 %include <huestream/config/Config.h>
 
+%include <huestream/IHueStream.h>
 %include <huestream/HueStream.h>
 

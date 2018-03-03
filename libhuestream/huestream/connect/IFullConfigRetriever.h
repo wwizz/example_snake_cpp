@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -13,17 +13,23 @@
 #include <memory>
 
 namespace huestream {
+    enum class ConfigType {
+        Small,
+        Full
+    };
 
     typedef std::function<void(OperationResult, BridgePtr)> RetrieveCallbackHandler;
 
-    class IFullConfigRetriever {
+    class IConfigRetriever {
     public:
-        virtual ~IFullConfigRetriever() = default;
+        virtual ~IConfigRetriever() = default;
 
         virtual bool Execute(BridgePtr bridge, RetrieveCallbackHandler cb) = 0;
     };
 
-    typedef std::shared_ptr<IFullConfigRetriever> FullConfigRetrieverPtr;
+    using ConfigRetrieverPtr = std::shared_ptr<IConfigRetriever>;
+    using FullConfigRetrieverPtr = ConfigRetrieverPtr;
+    using IFullConfigRetriever = IConfigRetriever;
 }  // namespace huestream
 
 #endif  // HUESTREAM_CONNECT_IFULLCONFIGRETRIEVER_H_

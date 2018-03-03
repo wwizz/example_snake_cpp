@@ -12,9 +12,9 @@
 #include "test/huestream/_mock/MockBridgeSearcher.h"
 #include "TestableConnectionFlow.h"
 #include "test/huestream/_mock/MockConnectionFlowFactory.h"
-#include "test/huestream/_mock/MockBridgeStorageAccesser.h"
+#include "test/huestream/_mock/MockBridgeStorageAccessor.h"
 #include "test/huestream/_stub/StubMessageDispatcher.h"
-#include "test/huestream/_mock/MockFullConfigRetriever.h"
+#include "test/huestream/_mock/MockConfigRetriever.h"
 #include "test/huestream/_mock/MockStream.h"
 
 using namespace testing;
@@ -30,8 +30,9 @@ public:
     shared_ptr<vector<shared_ptr<MockBridgeSearcher>>> _searchers;
     shared_ptr<vector<shared_ptr<MockBridgeAuthenticator>>> _authenticators;
     shared_ptr<StubMessageDispatcher> _messageDispatcher;
-    shared_ptr<MockBridgeStorageAccesser> _storageAccesser;
+    shared_ptr<MockBridgeStorageAccessor> _storageAccesser;
     shared_ptr<MockStream> _stream;
+    shared_ptr<HueStreamData> _persistentData;
     Sequence s;
 
     void SetUp() override;
@@ -45,6 +46,8 @@ public:
     void expect_message(FeedbackMessage::Id id, FeedbackMessage::FeedbackType type, BridgePtr bridge);
 
     void expect_message(FeedbackMessage::Id id, FeedbackMessage::FeedbackType type, BridgePtr bridge, BridgeStatus status);
+
+    void expect_message(FeedbackMessage::Id id, FeedbackMessage::FeedbackType type, int bridgeListSize);
 
     void expect_no_actions();
 
@@ -68,7 +71,7 @@ public:
 
     void searching_with_three_bridges_found_starts_pushlink_on_all_three_bridges();
 
-    void searching_with_one_bridge_found_starts_pushlink();
+    void searching_with_one_bridge_found_starts_pushlink(int index);
 
     void searching_background_with_one_bridge_found_finishes(int index = 0);
 
@@ -88,15 +91,25 @@ public:
 
     void finish_authorization_successfully(int index);
 
+    void expect_storage_accessor_load_return_data();
+
+    void expect_small_config_retrieval_return_data(int bridge_index);
+
+    void expect_small_config_retrieval_return_data(BridgePtr bridge);
+
+    void expect_initiate_small_config_retrieval();
+
     void expect_initiate_full_config_retrieval();
 
     void retrieve_full_config(int index, unsigned int numGroups, unsigned int numBridges = 1);
 
+    void checkUpdateMessages(bool connected, bool groupsUpdated, bool bridgeChanged);
+
     void finish(BridgePtr bridge);
 
-    void finish_without_stream_start(bool completed = true);
+    void finish_without_stream_start(bool completed = true, bool connected = true, bool groupsUpdated = true, bool bridgeChanged = true);
 
-    void finish_with_stream_start(BridgePtr bridge);
+    void finish_with_stream_start(BridgePtr bridge, bool connected = true, bool groupsUpdated = true, bool streamConnected = true, bool bridgeChanged = true);
 
     void abort_finalizes();
 
@@ -104,13 +117,13 @@ public:
 
     void select_group_existing(int bridgeindex, std::string groupid);
 
-    void select_group_not_existing(int bridgeindex, std::string groupid);
-
     shared_ptr<MockBridgeSearcher> get_last_searcher();
 
     shared_ptr<MockBridgeAuthenticator> get_last_authenticator();
 
-    shared_ptr<MockFullConfigRetriever> _fullConfigRetriever;
+    shared_ptr<MockConfigRetriever> _smallConfigRetriever;
+
+    shared_ptr<MockConfigRetriever> _fullConfigRetriever;
 
     void expect_on_storage_accesser_save();
 
@@ -118,8 +131,16 @@ public:
 
     void expect_on_storage_accesser_save(int numberOfBridges, std::string activeBridgeId);
 
+    void expect_on_small_config_retriever_execute() const {
+        EXPECT_CALL(*_smallConfigRetriever, Execute(_, _))
+                .Times(1)
+                .WillOnce(DoAll(
+                        SaveArg<0>(&_smallConfigRetriever->Bridge),
+                        SaveArg<1>(&_smallConfigRetriever->RetrieveCallback),
+                        Return(true)));
+    }
+
     void expect_on_full_config_retriever_execute() const {
-        
         EXPECT_CALL(*_fullConfigRetriever, Execute(_, _))
                 .Times(1)
                 .WillOnce(DoAll(
@@ -193,6 +214,12 @@ public:
         //change below comment for easier debugging on connectionflow tests
         (void)m;
         //std::cout << m.GetDebugMessage() << std::endl;
+    }
+
+    static void PrintExpectMsg(const FeedbackMessage::Id id) {
+        //change below comment for easier debugging on connectionflow tests
+        FeedbackMessage m(FeedbackMessage::REQUEST_TYPE_INTERNAL, id, nullptr);
+        //std::cout << "EXPECT: " << m.GetTag() << std::endl;
     }
 };
 

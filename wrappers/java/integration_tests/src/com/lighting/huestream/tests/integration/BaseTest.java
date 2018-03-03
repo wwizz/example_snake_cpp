@@ -32,7 +32,9 @@ public class BaseTest {
 
         result.SetUser(_user);
         result.SetClientKey(_clientKey);
-        result.SetTcpPort(_tcp_port.toString());
+        result.SetTcpPort(_tcp_port);
+        result.SetSslPort(_ssl_port);
+        result.EnableSsl();
 
         return result;
     }
@@ -84,8 +86,9 @@ public class BaseTest {
 
                 _udp_port = params.getOrDefault("-Dhue_streaming_port", DEFAULT_UDP_PORT);
                 _bridge_id = params.getOrDefault("-Dhue_bridge_id", DEFAULT_BRIDGE_ID);
-                parseApplyAddressAndPort(params.getOrDefault("-Dhue_bridge_ip", DEFAULT_ADDRESS));
-
+                _ssl_port = params.getOrDefault("-Dhue_https_port", DEFAULT_SSL_PORT);
+                _tcp_port = params.getOrDefault("-Dhue_http_port", DEFAULT_TCP_PORT);
+                _ipv4_address = params.getOrDefault("-Dhue_ip", DEFAULT_IP_ADDRESS);
             } catch (Exception e) {
                 System.out.println("Exception, setting default params " + e);
 
@@ -93,25 +96,13 @@ public class BaseTest {
                 _tcp_port = DEFAULT_TCP_PORT;
                 _bridge_id = DEFAULT_BRIDGE_ID;
                 _udp_port = DEFAULT_UDP_PORT;
+                _ssl_port = DEFAULT_SSL_PORT;
             }
 
-            System.out.println(String.format("IP_address=%s, tcp_port=%s, udp_port=%s, bridge_id=%s",
-                    _ipv4_address, _tcp_port, _udp_port, _bridge_id));
+            System.out.println(String.format("IP_address=%s, tcp_port=%s, udp_port=%s, ssl_port=%s, bridge_id=%s",
+                    _ipv4_address, _tcp_port, _udp_port, _ssl_port, _bridge_id));
 
         }
-    }
-
-    private void parseApplyAddressAndPort(final String address) throws InvalidPropertiesFormatException {
-        final String[] parts = address.split(":");
-            if (parts.length == 1) {
-                _ipv4_address = address;
-                _tcp_port = "80";
-            } else if (parts.length == 2) {
-                _ipv4_address = parts[0];
-                _tcp_port = parts[1];
-            } else {
-                throw new InvalidPropertiesFormatException("can not parse address: " + address);
-            }
     }
 
     private String readFile(final String fileName) throws IOException {
@@ -187,12 +178,13 @@ public class BaseTest {
     private String _bridge_id = "";
     private String _tcp_port = "";
     private String _udp_port = "";
+    private String _ssl_port = "";
 
 
     private static String DEFAULT_IP_ADDRESS = "192.168.1.51";
     private static String DEFAULT_TCP_PORT = "60202";
     private static String DEFAULT_UDP_PORT = "60202";
-    private static String DEFAULT_ADDRESS = DEFAULT_IP_ADDRESS + ":" + DEFAULT_TCP_PORT;
+    private static String DEFAULT_SSL_PORT = "61202";
     private static String DEFAULT_BRIDGE_ID = "001788fffe1ffd08";
 
 }

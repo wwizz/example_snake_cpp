@@ -7,6 +7,8 @@
 #include "gtest/gtest.h"
 #include "gmock/gmock.h"
 
+#include "support/util/Provider.h"
+
 using testing::ElementsAre;
 using namespace huestream;
 
@@ -21,7 +23,14 @@ class TestPlayer : public testing::Test {
 public:
     std::shared_ptr<Player> _player;
     std::shared_ptr<StubTimeProvider> _tp;
-    std::unique_ptr<TimeProviderProvider::Scope> _tpScope;
+    using ScopedtimeProviderProvider = support::ScopedProvider<TimeProviderPtr>;
+    ScopedtimeProviderProvider _tpScope;
+
+    TestPlayer()
+      : _tp(std::make_shared<StubTimeProvider>()),
+        _tpScope(_tp),
+        _player(std::make_shared<Player>())
+    {}
 
  protected:
    virtual void AddMillisecondsAndUpdateMarkers(int64_t milliseconds) {
@@ -34,7 +43,7 @@ public:
         return animation->GetValue();
     }
 
-    virtual std::shared_ptr<Animation> CreateCurveFromPoints(PointListPtr points, bool repeatable) {
+    virtual std::shared_ptr<Animation> CreateCurveFromPoints(PointListPtr points, bool repeatable = false) {
         double repeatTimes = 0;
         std::shared_ptr<Animation> curve;
 
@@ -51,12 +60,6 @@ public:
         auto curve = CreateCurveFromPoints(points, repeatable);
         _player->BindAnimations(AnimationHelper::CreatePtr(curve));
         return curve;
-    }
-
-    virtual void SetUp() {
-        _tp = std::make_shared<StubTimeProvider>();
-        _tpScope = TimeProviderProvider::SetProviderMethodInThisScope([this]()->TimeProviderPtr{return _tp;});
-        _player = std::make_shared<Player>();
     }
 
     virtual void TearDown() {
@@ -178,10 +181,11 @@ TEST_F(TestPlayer, CurvePlayesSlowerAndFasterWhenSpeedIsChanged) {
 
 
 TEST_F(TestPlayer, PlayerIsStoppedAfterCurvesArePlayed) {
-    auto curve = CreateCurveFromValuesAndBind(
+    auto curve = CreateCurveFromPoints(
             PointHelper::CreatePtr(NEW_PTR(Point, 0, 10), NEW_PTR(Point, 1000, 11)));
-    auto curve2 = CreateCurveFromValuesAndBind(
+    auto curve2 = CreateCurveFromPoints(
             PointHelper::CreatePtr(NEW_PTR(Point, 0, 10), NEW_PTR(Point, 2000, 11)));
+    _player->BindAnimations(AnimationHelper::CreatePtr(curve, curve2));
 
     EXPECT_EQ(_player->IsStopped(), true);
     _player->Start();
@@ -195,10 +199,11 @@ TEST_F(TestPlayer, PlayerIsStoppedAfterCurvesArePlayed) {
 }
 
 TEST_F(TestPlayer, PlayerIsNeverStoppedIfOnlyIncludesInfiniteCurveAnimation) {
-    auto curve = CreateCurveFromValuesAndBind(
+    auto curve = CreateCurveFromPoints(
             PointHelper::CreatePtr(NEW_PTR(Point, 0, 10), NEW_PTR(Point, 1000, 11)), true);
-    auto curve2 = CreateCurveFromValuesAndBind(
+    auto curve2 = CreateCurveFromPoints(
             PointHelper::CreatePtr(NEW_PTR(Point, 0, 10), NEW_PTR(Point, 2000, 11)), true);
+    _player->BindAnimations(AnimationHelper::CreatePtr(curve, curve2));
 
     EXPECT_EQ(_player->IsStopped(), true);
     _player->Start();
@@ -214,10 +219,11 @@ TEST_F(TestPlayer, PlayerIsNeverStoppedIfOnlyIncludesInfiniteCurveAnimation) {
 }
 
 TEST_F(TestPlayer, PlayerIsStoppedAfterMixedCurveTypesAreArePlayedOnFiniteCurvePosition) {
-    auto curve = CreateCurveFromValuesAndBind(
+    auto curve = CreateCurveFromPoints(
             PointHelper::CreatePtr(NEW_PTR(Point, 0, 10), NEW_PTR(Point, 1000, 11)));
-    auto curve2 = CreateCurveFromValuesAndBind(
+    auto curve2 = CreateCurveFromPoints(
             PointHelper::CreatePtr(NEW_PTR(Point, 0, 10), NEW_PTR(Point, 2000, 11)), true);
+    _player->BindAnimations(AnimationHelper::CreatePtr(curve, curve2));
 
     EXPECT_EQ(_player->IsStopped(), true);
     _player->Start();
@@ -236,6 +242,5 @@ TEST_F(TestPlayer, CreatePlayer) {
 
     _player =  std::make_shared<Player>(AnimationHelper::CreatePtr(curve));
     EXPECT_EQ(_player->IsStopped(), true);
-
 }
 

@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 /** @file */
@@ -39,6 +39,8 @@ namespace huestream {
                 ID_PRESS_PUSH_LINK,                        ///< user should press the pushlink button on the bridge
                 ID_FINISH_AUTHORIZING_AUTHORIZED,
                 ID_FINISH_AUTHORIZING_FAILED,
+                ID_START_RETRIEVING_SMALL,
+                ID_FINISH_RETRIEVING_SMALL,
                 ID_START_RETRIEVING,
                 ID_FINISH_RETRIEVING_FAILED,
                 ID_FINISH_RETRIEVING_READY_TO_START,
@@ -67,6 +69,7 @@ namespace huestream {
                 ID_BRIDGE_DISCONNECTED,                    ///< bridge got disconnected
                 ID_STREAMING_CONNECTED,                    ///< streaming got connected
                 ID_STREAMING_DISCONNECTED,                 ///< streaming got disconnected
+                ID_BRIDGE_CHANGED,                         ///< bridge config changed (id, name, version etc)
                 ID_LIGHTS_UPDATED,                         ///< lights in the group have changed
                 ID_GROUPLIST_UPDATED,                      ///< list of entertainment groups has changed
                 ID_GROUP_LIGHTSTATE_UPDATED,               ///< home automation light state of the group has changed
@@ -77,18 +80,18 @@ namespace huestream {
              type of requests supported by connection flow
              */
             enum RequestType {
-                REQUEST_TYPE_INTERNAL,           ///< no request
-                REQUEST_TYPE_LOAD_BRIDGE,        ///< load stored bridge information
-                REQUEST_TYPE_CONNECT,            ///< if a valid bridge is stored connect to it, else discover a new bridge and connect to it
-                REQUEST_TYPE_CONNECT_BACKGROUND, ///< if a valid bridge is stored connect to it, else check if a valid bridge is on the network but don't connect yet
-                REQUEST_TYPE_CONNECT_IP,         ///< connect to a bridge with manually set ip address
-                REQUEST_TYPE_SET_MANUAL_BRIDGE,  ///< connect to a known bridge, with at least set ip address, username and clientkey
-                REQUEST_TYPE_CONNECT_NEW,        ///< connect to a new bridge, even if a valid bridge is stored already
-                REQUEST_TYPE_RESET_BRIDGE,       ///< delete stored information of current bridge
-                REQUEST_TYPE_RESET_ALL,          ///< delete all stored bridge information
-                REQUEST_TYPE_SELECT,             ///< select entertainment group to use
-                REQUEST_TYPE_ACTIVATE,           ///< start streaming
-                REQUEST_TYPE_DEACTIVATE          ///< stop streaming
+                REQUEST_TYPE_INTERNAL,            ///< no request
+                REQUEST_TYPE_LOAD_BRIDGE,         ///< load stored bridge information
+                REQUEST_TYPE_CONNECT,             ///< if a valid bridge is stored connect to it, else discover a new bridge and connect to it
+                REQUEST_TYPE_CONNECT_BACKGROUND,  ///< if a valid bridge is stored connect to it, else check if a valid bridge is on the network but don't connect yet
+                REQUEST_TYPE_CONNECT_IP,          ///< connect to a bridge with manually set ip address
+                REQUEST_TYPE_SET_MANUAL_BRIDGE,   ///< connect to a known bridge, with at least set ip address, username and clientkey
+                REQUEST_TYPE_CONNECT_NEW,         ///< connect to a new bridge, even if a valid bridge is stored already
+                REQUEST_TYPE_RESET_BRIDGE,        ///< delete stored information of current bridge
+                REQUEST_TYPE_RESET_ALL,           ///< delete all stored bridge information
+                REQUEST_TYPE_SELECT,              ///< select entertainment group to use
+                REQUEST_TYPE_ACTIVATE,            ///< start streaming
+                REQUEST_TYPE_DEACTIVATE           ///< stop streaming
             };
 
             /**

@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -9,11 +9,11 @@
 
 namespace huestream {
 
-    PROP_IMPL_BOOL(AppSettings, bool, useForcedActivation, UseForcedActivation);
+    PROP_IMPL(AppSettings, ActivationOverrideLevel, activationOverride, ActivationOverride);
     PROP_IMPL_BOOL(AppSettings, bool, autoStartAtConnection, AutoStartAtConnection);
     PROP_IMPL_BOOL(AppSettings, bool, useRenderThread, UseRenderThread);
-    PROP_IMPL(AppSettings, std::string, name, Name);
-    PROP_IMPL(AppSettings, std::string, platform, Platform);
+    PROP_IMPL(AppSettings, std::string, appName, AppName);
+    PROP_IMPL(AppSettings, std::string, deviceName, DeviceName);
     PROP_IMPL(AppSettings, std::string, language, Language);
     PROP_IMPL(AppSettings, std::string, region, Region);
     PROP_IMPL(AppSettings, std::string, bridgeFileName, BridgeFileName);
@@ -21,15 +21,19 @@ namespace huestream {
     PROP_IMPL(AppSettings, int, monitorIntervalNotStreamingMs, MonitorIntervalNotStreamingMs);
 
     AppSettings::AppSettings() {
-        SetUseForcedActivation(true);
+        SetActivationOverride(ACTIVATION_OVERRIDELEVEL_SAMEGROUP);
         SetAutoStartAtConnection(true);
         SetUseRenderThread(true);
-        SetName("");
-        SetPlatform("");
+        SetAppName("");
+        SetDeviceName("");
         SetLanguage("en");
         SetRegion("US");
         SetBridgeFileName(BRIDGE_STORAGE_FILENAME);
         SetMonitorIntervalStreamingMs(5000);
         SetMonitorIntervalNotStreamingMs(15000);
+    }
+
+    bool AppSettings::UseForcedActivation() {
+        return _activationOverride != ACTIVATION_OVERRIDELEVEL_NEVER;
     }
 }  // namespace huestream

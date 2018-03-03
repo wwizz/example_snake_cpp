@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -12,16 +12,16 @@ using std::make_shared;
 
 namespace huestream {
 
-    Config::Config(const std::string &name,
-                              const std::string &platform,
+    Config::Config(const std::string &appName,
+                              const std::string &deviceName,
                               const std::string &language,
                               const std::string &region) :
             _bridgeSettings(std::make_shared<BridgeSettings>()),
             _streamSettings(std::make_shared<StreamSettings>()),
             _appSettings(std::make_shared<AppSettings>()),
             _streamingMode(STREAMING_MODE_DTLS) {
-        _appSettings->SetName(name);
-        _appSettings->SetPlatform(platform);
+        _appSettings->SetAppName(appName);
+        _appSettings->SetDeviceName(deviceName);
         _appSettings->SetLanguage(language);
         _appSettings->SetRegion(region);
     }

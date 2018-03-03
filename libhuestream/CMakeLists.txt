@@ -12,10 +12,6 @@ if (IS_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/support)
     add_subdirectory(support)
 endif()
 
-if (IS_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/3rd_party)
-    add_subdirectory(3rd_party)
-endif()
-
 #============================================
 # bridgediscovery
 #============================================

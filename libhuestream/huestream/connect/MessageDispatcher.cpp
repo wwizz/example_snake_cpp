@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -30,8 +30,8 @@ void MessageDispatcher::Execute(bool useThisTread) {
     if (useThisTread) {
         Loop();
     } else {
-        huesdk_lib::ThreadTask task = [this]() -> void { Loop(); };
-        _thread = std::unique_ptr<huesdk_lib::Thread>(new huesdk_lib::Thread(task));
+        support::ThreadTask task = [this]() -> void { Loop(); };
+        _thread = std::unique_ptr<support::Thread>(new support::Thread(task));
     }
     WaitUntilStarted();
 }

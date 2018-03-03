@@ -1,25 +1,24 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
 #ifndef HUESTREAM_STREAM_DTLSUDPCLIENT_H_
 #define HUESTREAM_STREAM_DTLSUDPCLIENT_H_
 
-#include <network/sockets/SocketUdp.h>
-#include <edtls/wrapper/mbedtls/UDPBase.h>
-#include <edtls/wrapper/mbedtls/UDPClientBase.h>
-
 #include <string>
 #include <memory>
 
+#include "support/network/sockets/SocketUdp.h"
+#include "edtls/wrapper/mbedtls/UDPBase.h"
+#include "edtls/wrapper/mbedtls/UDPClientBase.h"
 
 namespace huestream {
 
 class DtlsUdpClient : public UDPBlocking<UDPClientBase> {
  private:
-    std::shared_ptr<huesdk_lib::SocketUdp> socketUdp_;
-    huesdk_lib::SocketAddress remote_;
+    std::shared_ptr<support::SocketUdp> socketUdp_;
+    support::SocketAddress remote_;
     bool connected;
 
     int Send(const unsigned char *buf, size_t len) override;

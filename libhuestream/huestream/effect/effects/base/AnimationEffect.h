@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -29,7 +29,7 @@ namespace huestream {
 
         virtual void RenderUpdate() = 0;
 
-        void InitializeAnimations();
+        virtual void InitializeAnimations();
 
         /**
          constructor

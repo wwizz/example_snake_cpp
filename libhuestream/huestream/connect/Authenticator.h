@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -21,6 +21,8 @@ namespace huestream {
 
         protected:
             HttpClientPtr _http;
+
+            std::string CreateDeviceType(AppSettingsPtr appSettings);
 
             void ParseCredentials(JSONNode root, BridgePtr bridge);
 

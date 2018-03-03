@@ -1,9 +1,10 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
 #include <huestream/common/data/Bridge.h>
+#include <huestream/common/data/ApiVersion.h>
 #include <huestream/config/Config.h>
 
 #include <map>
@@ -39,6 +40,7 @@ PROP_IMPL(Bridge, std::string, apiversion, Apiversion);
 PROP_IMPL(Bridge, std::string, id, Id);
 PROP_IMPL(Bridge, std::string, ipAddress, IpAddress);
 PROP_IMPL(Bridge, std::string, tcpPort, TcpPort);
+PROP_IMPL(Bridge, std::string, sslPort, SslPort);
 PROP_IMPL_BOOL(Bridge, bool, isValidIp, IsValidIp);
 PROP_IMPL_BOOL(Bridge, bool, isAuthorized, IsAuthorized);
 PROP_IMPL_BOOL(Bridge, bool, isBusy, IsBusy);
@@ -47,6 +49,7 @@ PROP_IMPL(Bridge, std::string, user, User);
 PROP_IMPL(Bridge, GroupListPtr, groups, Groups);
 PROP_IMPL(Bridge, std::string, selectedGroup, SelectedGroup);
 PROP_IMPL(Bridge, int, maxNoStreamingSessions, MaxNoStreamingSessions);
+PROP_IMPL_GET(Bridge, bool, isUsingSsl, IsUsingSsl);
 
 Bridge::Bridge(BridgeSettingsPtr bridgeSettings)
     : Bridge("", "", false, bridgeSettings) {
@@ -62,7 +65,8 @@ Bridge::Bridge(std::string id, std::string ip, bool ipValid, BridgeSettingsPtr b
     _isBusy(false),
     _groups(std::make_shared<GroupList>()),
     _selectedGroup(NO_SELECTED_GROUP),
-    _maxNoStreamingSessions(0) {
+    _maxNoStreamingSessions(0),
+    _isUsingSsl(false) {
 }
 
 void Bridge::Clear() {
@@ -141,13 +145,12 @@ bool Bridge::IsFound() const {
 bool Bridge::IsValidModelId() const {
     std::regex re("BSB(\\d+)");
     std::smatch match;
-    const int supportedVersion = 2;
     if (!std::regex_search(_modelId, match, re) || match.size() != 2) {
         return false;
     }
     auto version = std::stoi(match.str(1));
 
-    return (version >= supportedVersion);
+    return version >= _bridgeSettings->GetSupportedModel();
 }
 
 bool Bridge::IsConnectable() const {
@@ -162,32 +165,25 @@ bool Bridge::IsConnected() const {
 }
 
 bool Bridge::IsValidApiVersion() const {
-    const int min_major = _bridgeSettings->GetSupportedApiVersionMajor();
-    const int min_minor = _bridgeSettings->GetSupportedApiVersionMinor();
-    const int min_build = _bridgeSettings->GetSupportedApiVersionBuild();
-    std::regex re("(\\d+)\\.(\\d+)\\.(\\d+)");
-    std::smatch match;
-    if (!std::regex_search(_apiversion, match, re) || match.size() != 4) {
-        return false;
-    }
-    auto major = std::stoi(match.str(1));
-    auto minor = std::stoi(match.str(2));
-    auto build = std::stoi(match.str(3));
+    ApiVersion thisVersion(_apiversion);
+    ApiVersion minVersion(_bridgeSettings->GetSupportedApiVersionMajor(),
+        _bridgeSettings->GetSupportedApiVersionMinor(),
+        _bridgeSettings->GetSupportedApiVersionBuild());
 
-    if (major < min_major) {
-        return false;
-    }
-    if (major == min_major && minor < min_minor) {
-        return false;
-    }
-    if (major == min_major && minor == min_minor && build < min_build) {
-        return false;
-    }
-    return true;
+    return thisVersion.IsValid() && thisVersion >= minVersion;
 }
 
 bool Bridge::IsValidClientKey() const {
     return _clientKey.length() == 32;
+}
+
+bool Bridge::IsSupportingHttps() const {
+    ApiVersion thisVersion(_apiversion);
+    ApiVersion minVersion(_bridgeSettings->GetSupportedHttpsApiVersionMajor(),
+        _bridgeSettings->GetSupportedHttpsApiVersionMinor(),
+        _bridgeSettings->GetSupportedHttpsApiVersionBuild());
+
+    return thisVersion.IsValid() && thisVersion >= minVersion && (_modelId.empty() || IsValidModelId());
 }
 
 bool Bridge::IsGroupSelected() const {
@@ -196,6 +192,15 @@ bool Bridge::IsGroupSelected() const {
 
 bool Bridge::IsValidGroupSelected() const {
     return (GetGroup() != nullptr);
+}
+
+bool Bridge::IsProxyNodeUnreachable() const {
+    auto group = GetGroup();
+    if (group == nullptr) {
+        return false;
+    }
+
+    return !group->GetProxyNode().isReachable;
 }
 
 bool Bridge::IsReadyToStream() const {
@@ -226,13 +231,30 @@ bool Bridge::SelectGroupIfOnlyOneOption() {
 }
 
 bool Bridge::SelectGroup(std::string id) {
-    SetSelectedGroup(id);
-    return IsValidGroupSelected();
+    for (auto i = _groups->begin(); i != _groups->end(); ++i) {
+        if ((*i)->GetId() == id) {
+            SetSelectedGroup(id);
+            return true;
+        }
+    }
+    return false;
 }
 
 GroupPtr Bridge::GetGroup() const {
+    return GetGroupById(_selectedGroup);
+}
+
+LightListPtr Bridge::GetGroupLights() const {
+    auto group = GetGroup();
+    if (group == nullptr) {
+        return std::make_shared<LightList>();
+    }
+    return group->GetLights();
+}
+
+GroupPtr Bridge::GetGroupById(std::string id) const {
     for (auto i = _groups->begin(); i != _groups->end(); ++i) {
-        if ((*i)->GetId() == _selectedGroup) {
+        if ((*i)->GetId() == id) {
             return (*i);
         }
     }
@@ -248,13 +270,14 @@ void Bridge::DeleteGroup(std::string id) {
     }
 }
 
-GroupPtr Bridge::GetGroupOwnedByOtherClient() const {
+GroupListPtr Bridge::GetGroupsOwnedByOtherClient() const {
+    auto groups = std::make_shared<GroupList>();
     for (auto i = _groups->begin(); i != _groups->end(); ++i) {
         if ((*i)->Active() && (*i)->GetOwner() != _user) {
-            return (*i);
+            groups->push_back(*i);
         }
     }
-    return nullptr;
+    return groups;
 }
 
 int Bridge::GetCurrentNoStreamingSessions() const {
@@ -269,10 +292,20 @@ int Bridge::GetCurrentNoStreamingSessions() const {
 
 std::ostringstream Bridge::GetStreamApiRootUrl() const {
     std::ostringstream oss;
-    oss << "http://" << _ipAddress;
-    if (!_tcpPort.empty()) {
-        oss << ":" << _tcpPort;
+
+    auto protocol = _isUsingSsl ? "https" : "http";
+    oss << protocol << "://" << _ipAddress;
+
+    if (_isUsingSsl) {
+        if (!_sslPort.empty()) {
+            oss << ":" << _sslPort;
+        }
+    } else {
+        if (!_tcpPort.empty()) {
+            oss << ":" << _tcpPort;
+        }
     }
+
     oss << "/api/";
 
     return oss;
@@ -287,6 +320,14 @@ std::string Bridge::GetBaseUrl() const {
     if (!_user.empty()) {
         oss << _user << "/";
     }
+
+    return oss.str();
+}
+
+std::string Bridge::GetSmallConfigUrl() const {
+    auto oss = GetStreamApiRootUrl();
+
+    oss << "config/";
 
     return oss.str();
 }
@@ -339,12 +380,14 @@ void Bridge::SerializeBase(JSONNode *node) const {
     SerializeValue(node, AttributeId, _id);
     SerializeValue(node, AttributeIpAddress, _ipAddress);
     SerializeValue(node, AttributeTcpPort, _tcpPort);
+    SerializeValue(node, AttributeSslPort, _sslPort);
     SerializeValue(node, AttributeIsValidIp, _isValidIp);
     SerializeValue(node, AttributeIsAuthorized, _isAuthorized);
     SerializeValue(node, AttributeClientKey, _clientKey);
     SerializeValue(node, AttributeUser, _user);
     SerializeValue(node, AttributeSelectedGroup, _selectedGroup);
     SerializeValue(node, AttributeMaxNoStreamingSessions, _maxNoStreamingSessions);
+    SerializeValue(node, AttributeIsUsingSsl, _isUsingSsl);
 }
 
 void Bridge::DeserializeBase(JSONNode *node) {
@@ -356,12 +399,24 @@ void Bridge::DeserializeBase(JSONNode *node) {
     DeserializeValue(node, AttributeId, &_id, "");
     DeserializeValue(node, AttributeIpAddress, &_ipAddress, "");
     DeserializeValue(node, AttributeTcpPort, &_tcpPort, "");
+    DeserializeValue(node, AttributeSslPort, &_sslPort, "");
     DeserializeValue(node, AttributeIsValidIp, &_isValidIp, false);
     DeserializeValue(node, AttributeIsAuthorized, &_isAuthorized, false);
     DeserializeValue(node, AttributeClientKey, &_clientKey, "");
     DeserializeValue(node, AttributeUser, &_user, "");
     DeserializeValue(node, AttributeSelectedGroup, &_selectedGroup, "");
     DeserializeValue(node, AttributeMaxNoStreamingSessions, &_maxNoStreamingSessions, 0);
+    DeserializeValue(node, AttributeIsUsingSsl, &_isUsingSsl, false);
+}
+
+BridgePtr Bridge::Clone() const {
+    auto bridgeCopy = std::make_shared<Bridge>(*this);
+    bridgeCopy->SetGroups(clone_list(_groups));
+    return bridgeCopy;
+}
+
+void Bridge::EnableSsl() {
+    _isUsingSsl = true;
 }
 
 }  // namespace huestream

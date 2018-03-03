@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright © 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 

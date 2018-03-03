@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -68,6 +68,9 @@ bool HueStreamData::RediscoverKnownBridge(BridgeListPtr discoveredBridges) {
                 if (discoveredBridge->GetId() == knownBridge->GetId()) {
                     knownBridge->SetIpAddress(discoveredBridge->GetIpAddress());
                     knownBridge->SetIsValidIp(true);
+                    if (discoveredBridge->GetIsUsingSsl()) {
+                        knownBridge->EnableSsl();
+                    }
                     SetActiveBridge(knownBridge);
                     return true;
                 }
@@ -75,6 +78,17 @@ bool HueStreamData::RediscoverKnownBridge(BridgeListPtr discoveredBridges) {
         }
     }
     return false;
+}
+
+BridgeListPtr HueStreamData::GetAllKnownBridges() {
+    auto knownBridges = std::make_shared<BridgeList>();
+    for (auto rit = _bridges->rbegin(); rit != _bridges->rend(); ++rit) {
+        auto bridge = *rit;
+        if (bridge->HasEverBeenAuthorizedForStreaming()) {
+            knownBridges->push_back(bridge);
+        }
+    }
+    return knownBridges;
 }
 
 void HueStreamData::Serialize(JSONNode *node) const {

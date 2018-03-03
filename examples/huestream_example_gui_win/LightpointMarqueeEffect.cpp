@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -42,8 +42,8 @@ namespace huestream {
 
         SetColorAnimation(r, g, b);
 
-        auto alphaTween = std::make_shared<TweenAnimation>(alphaAnimation->GetValue(), alphaAnimation->GetValue(), offset, TweenType::Linear);
-        SetOpacityAnimation(alphaTween);
+        alphaAnimation->SetLength(offset);
+        SetOpacityAnimation(alphaAnimation);
 
         SetSpeedAnimation(speedAnimation);
 

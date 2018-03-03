@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 /** @file */
@@ -49,7 +49,7 @@ namespace huestream {
          @param name Scene friendly name
          @param appData Scene app data field
          */
-        Scene(std::string tag, std::string name = "", std::string appData = "");
+        explicit Scene(std::string tag, std::string name = "", std::string appData = "");
 
         /**
          destructor

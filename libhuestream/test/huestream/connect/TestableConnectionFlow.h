@@ -63,4 +63,8 @@ MATCHER_P4(FbMessageWithBridgeAndStatus, id, type, bridge, status, "") {
            arg.GetBridge()->GetStatus() == status;
 };
 
+MATCHER_P3(FbMessageWithBridgeList, id, type, size, "") {
+    return arg.GetId() == id && arg.GetMessageType() == type && arg.GetBridgeList()->size() == size;
+};
+
 #endif //LIBHUESTREAM_TESTABLECONNECTIONFLOW_H

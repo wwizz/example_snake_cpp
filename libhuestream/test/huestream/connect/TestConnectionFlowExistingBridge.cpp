@@ -21,6 +21,8 @@ public:
     void SetUp() override {
         TestConnectionFlowBase::SetUp();
 
+        _settings->SetAutoStartAtConnection(false);
+
         auto existingBridge = std::make_shared<Bridge>("001788FFFE2007DD", "192.168.1.37", true, std::make_shared<BridgeSettings>());
         existingBridge->SetModelId("BSB002");
         existingBridge->SetApiversion("1.22.0");
@@ -51,10 +53,11 @@ public:
         _messageDispatcher->ExecutePendingActions();
     }
 
-    void finish_loading_execute_fullconfig_with_valid_bridge() {
+    void finish_loading_execute_fullconfig_with_valid_bridge(int index, int numGroups) {
+        expect_small_config_retrieval_return_data(index);
         finish_loading();
 
-        set_bridge_in_full_config(1);
+        set_bridge_in_full_config(numGroups);
         expect_on_storage_accesser_save();
         expect_message(FeedbackMessage::ID_FINISH_RETRIEVING_READY_TO_START, FeedbackMessage::FEEDBACK_TYPE_INFO, _existingBridgeData->GetActiveBridge(), BRIDGE_READY);
 
@@ -63,6 +66,8 @@ public:
     }
 
     void finish_loading_execute_fullconfig_with_no_groups() {
+        expect_small_config_retrieval_return_data(0);
+
         finish_loading();
 
         set_bridge_in_full_config(0);
@@ -76,6 +81,7 @@ public:
     }
 
     void finish_loading_execute_fullconfig_not_authorized_starts_pushlink(int index) {
+        expect_small_config_retrieval_return_data(index);
         finish_loading();
 
         set_bridge_not_authorized_for_full_config();
@@ -89,7 +95,13 @@ public:
         _messageDispatcher->ExecutePendingActions();
     }
 
-    void finish_loading_execute_fullconfig_not_found_starts_bridgesearch() {
+    void finish_loading_execute_fullconfig_not_found_starts_bridgesearch(int index) {
+        if (index >= 0) {
+            expect_small_config_retrieval_return_data(index);
+        }
+        else {
+            expect_small_config_retrieval_return_data(_existingBridgeData->GetActiveBridge());
+        }
         finish_loading();
 
         set_bridge_not_found_for_full_config();
@@ -103,6 +115,9 @@ public:
 
     void finish_loading_start_bridgesearch() {
         expect_message(FeedbackMessage::ID_FINISH_LOADING_BRIDGE_CONFIGURED, FeedbackMessage::FEEDBACK_TYPE_INFO, _existingBridgeData->GetActiveBridge());
+
+        expect_small_config_retrieval_return_data(_existingBridgeData->GetActiveBridge());
+
         expect_message(FeedbackMessage::ID_START_SEARCHING, FeedbackMessage::FEEDBACK_TYPE_INFO);
         expect_on_searcher_search_new(false);
 
@@ -112,29 +127,33 @@ public:
 
     void connect_bridge_found_on_different_ip(int index) {
         connect_starts_bridge_loading();
-        finish_loading_execute_fullconfig_not_found_starts_bridgesearch();
+        finish_loading_execute_fullconfig_not_found_starts_bridgesearch(index);
 
         expect_message(FeedbackMessage::ID_FINISH_SEARCH_BRIDGES_FOUND, FeedbackMessage::FEEDBACK_TYPE_INFO);
         expect_initiate_full_config_retrieval();
         finish_search_with_three_bridges(get_last_searcher());
 
         retrieve_full_config(index, 1);
+        
+        finish(_bridges->at(index));
     }
 
     void connect_bridge_lost_other_known_bridge_found(int index, int numBridges = 2) {
         connect_starts_bridge_loading();
-        finish_loading_execute_fullconfig_not_found_starts_bridgesearch();
+        finish_loading_execute_fullconfig_not_found_starts_bridgesearch(index);
 
         expect_message(FeedbackMessage::ID_FINISH_SEARCH_BRIDGES_FOUND, FeedbackMessage::FEEDBACK_TYPE_INFO);
         expect_initiate_full_config_retrieval();
         finish_search_with_three_bridges(get_last_searcher());
 
         retrieve_full_config(index, 1, numBridges);
+
+        finish(_bridges->at(index));
     }
 
-    void connect_bridge_is_lost() {
+    void connect_bridge_is_lost(int index) {
         connect_starts_bridge_loading();
-        finish_loading_execute_fullconfig_not_found_starts_bridgesearch();
+        finish_loading_execute_fullconfig_not_found_starts_bridgesearch(index);
 
         searching_once_with_no_bridges_found_starts_new_bridge_search();
         searching_twice_with_no_bridges_found_finalizes(_existingBridgeData->GetActiveBridge(), true);
@@ -149,7 +168,7 @@ INSTANTIATE_TEST_CASE_P(ValidBridgeInFullConfig,
 TEST_P(TestConnectionFlow_ExistingBridge, ValidBridgeInFullConfig) {
     _settings->SetAutoStartAtConnection(int2bool(GetParam()));
     connect_starts_bridge_loading();
-    finish_loading_execute_fullconfig_with_valid_bridge();
+    finish_loading_execute_fullconfig_with_valid_bridge(1, 1);
     finish(_existingBridgeData->GetActiveBridge());
 }
 
@@ -166,15 +185,15 @@ TEST_F(TestConnectionFlow_ExistingBridge, AuthorizationIsLost) {
 }
 
 TEST_F(TestConnectionFlow_ExistingBridge, IpAddressIsChanged) {
-    _existingBridgeData->GetActiveBridge()->SetId(_bridges->at(1)->GetId());
-
+    _bridges->at(1) = _existingBridgeData->GetActiveBridge()->Clone();
+    _existingBridgeData->GetActiveBridge()->SetIpAddress("192.168.1.123");
     connect_bridge_found_on_different_ip(1);
 }
 
 TEST_F(TestConnectionFlow_ExistingBridge, BridgeIsLost) {
     _existingBridgeData->GetActiveBridge()->SetId(_bridges->at(1)->GetId());
 
-    connect_bridge_is_lost();
+    connect_bridge_is_lost(1);
 }
 
 TEST_F(TestConnectionFlow_ExistingBridge, BridgeWasPreviouslyLostAndNowBack) {
@@ -182,7 +201,7 @@ TEST_F(TestConnectionFlow_ExistingBridge, BridgeWasPreviouslyLostAndNowBack) {
     _existingBridgeData->GetActiveBridge()->SetIsValidIp(false);
 
     connect_starts_bridge_loading();
-    finish_loading_execute_fullconfig_with_valid_bridge();
+    finish_loading_execute_fullconfig_with_valid_bridge(1, 1);
     finish(_existingBridgeData->GetActiveBridge());
 }
 
@@ -197,7 +216,7 @@ TEST_F(TestConnectionFlow_ExistingBridge, BridgeWasPreviouslyLostAndNowStill) {
     _existingBridgeData->GetActiveBridge()->SetId(_bridges->at(1)->GetId());
     _existingBridgeData->GetActiveBridge()->SetIsValidIp(false);
 
-    connect_bridge_is_lost();
+    connect_bridge_is_lost(1);
 }
 
 TEST_F(TestConnectionFlow_ExistingBridge, BridgeIsV1) {
@@ -215,7 +234,7 @@ TEST_F(TestConnectionFlow_ExistingBridge, BridgeIsV1) {
 
 TEST_F(TestConnectionFlow_ExistingBridge, ConnectBackgroundValidBridgeInFullConfig) {
     connect_starts_bridge_loading(true);
-    finish_loading_execute_fullconfig_with_valid_bridge();
+    finish_loading_execute_fullconfig_with_valid_bridge(1, 1);
     finish(_existingBridgeData->GetActiveBridge());
 }
 
@@ -242,10 +261,17 @@ TEST_F(TestConnectionFlow_ExistingBridge, BridgeIsLostButAnotherKnownBridgeIsFou
     connect_bridge_lost_other_known_bridge_found(2, 3);
 }
 
+TEST_F(TestConnectionFlow_ExistingBridge, BridgeIsLostButAnotherUnknownBridgeIsFound) {
+    connect_starts_bridge_loading();
+    finish_loading_execute_fullconfig_not_found_starts_bridgesearch(-1);
+
+    searching_with_three_bridges_found_starts_pushlink_on_all_three_bridges();
+}
+
 TEST_F(TestConnectionFlow_ExistingBridge, dont_start_if_disconnected) {
     _settings->SetAutoStartAtConnection(false);
     connect_starts_bridge_loading();
-    finish_loading_execute_fullconfig_with_valid_bridge();
+    finish_loading_execute_fullconfig_with_valid_bridge(1, 1);
     finish(_existingBridgeData->GetActiveBridge());
 
     expect_message(FeedbackMessage::ID_USERPROCEDURE_STARTED, FeedbackMessage::FEEDBACK_TYPE_INFO);
@@ -262,3 +288,77 @@ TEST_F(TestConnectionFlow_ExistingBridge, dont_start_if_disconnected) {
     _messageDispatcher->ExecutePendingActions();
 }
 
+TEST_F(TestConnectionFlow_ExistingBridge, load_only) {
+    addAnotherKnownBridge("123456");
+    _existingBridgeData->GetActiveBridge()->SetIsValidIp(false);
+
+    expect_message(FeedbackMessage::ID_USERPROCEDURE_STARTED, FeedbackMessage::FEEDBACK_TYPE_INFO);
+    expect_message(FeedbackMessage::ID_START_LOADING, FeedbackMessage::FEEDBACK_TYPE_INFO);
+    expect_on_storage_accesser_load();
+    _connectionFlow->Load();
+    _messageDispatcher->ExecutePendingActions();
+
+    expect_message(FeedbackMessage::ID_FINISH_LOADING_BRIDGE_CONFIGURED, FeedbackMessage::FEEDBACK_TYPE_INFO, 2);
+    expect_message(FeedbackMessage::ID_BRIDGE_CHANGED, FeedbackMessage::FEEDBACK_TYPE_INFO);
+    expect_message(FeedbackMessage::ID_USERPROCEDURE_FINISHED, FeedbackMessage::FEEDBACK_TYPE_INFO);
+
+    _storageAccesser->load_callback(OPERATION_SUCCESS, _existingBridgeData);
+    _messageDispatcher->ExecutePendingActions();
+}
+
+INSTANTIATE_TEST_CASE_P(existing_https_bridge, TestConnectionFlow_ExistingBridge, Values(true, false));
+
+TEST_P(TestConnectionFlow_ExistingBridge, existing_https_bridge__ssl_disabled__small_config_has_new_api__ssl_enabled) {
+    _persistentData->SetActiveBridge(_bridges->at(4));
+    EXPECT_FALSE(_persistentData->GetActiveBridge()->GetIsUsingSsl());
+
+    expect_message(FeedbackMessage::ID_USERPROCEDURE_STARTED, FeedbackMessage::FEEDBACK_TYPE_INFO);
+    expect_storage_accessor_load_return_data();
+    expect_small_config_retrieval_return_data(4);
+
+    if (GetParam()) {
+        _connectionFlow->ConnectToBridgeBackground();
+    }
+    else {
+        _connectionFlow->ConnectToBridge();
+    }
+
+    expect_message(FeedbackMessage::ID_START_AUTHORIZING, FeedbackMessage::FEEDBACK_TYPE_INFO);
+    expect_message(FeedbackMessage::ID_PRESS_PUSH_LINK, FeedbackMessage::FEEDBACK_TYPE_USER);
+    expect_on_authenticator_authenticate(4);
+    _messageDispatcher->ExecutePendingActions();
+
+    EXPECT_TRUE(_persistentData->GetActiveBridge()->GetIsUsingSsl());
+}
+
+TEST_P(TestConnectionFlow_ExistingBridge, existing_https_bridge__ssl_enabled__small_config_has_old_api__ssl_still_enabled) {
+    auto bridge_with_old_api = std::make_shared<Bridge>(std::make_shared<BridgeSettings>());
+    bridge_with_old_api->SetModelId("BSB002");
+    bridge_with_old_api->SetApiversion("1.22.0");
+    bridge_with_old_api->SetId(_bridges->at(4)->GetId());
+    EXPECT_FALSE(bridge_with_old_api->GetIsUsingSsl());
+
+    _persistentData->SetActiveBridge(_bridges->at(4));
+    _persistentData->GetActiveBridge()->EnableSsl();
+    EXPECT_TRUE(_persistentData->GetActiveBridge()->GetIsUsingSsl());
+
+    expect_message(FeedbackMessage::ID_USERPROCEDURE_STARTED, FeedbackMessage::FEEDBACK_TYPE_INFO);
+    expect_storage_accessor_load_return_data();
+    // return bridge with old api from small config
+    expect_small_config_retrieval_return_data(bridge_with_old_api);
+
+    if (GetParam()) {
+        _connectionFlow->ConnectToBridgeBackground();
+    }
+    else {
+        _connectionFlow->ConnectToBridge();
+    }
+
+    expect_message(FeedbackMessage::ID_START_AUTHORIZING, FeedbackMessage::FEEDBACK_TYPE_INFO);
+    expect_message(FeedbackMessage::ID_PRESS_PUSH_LINK, FeedbackMessage::FEEDBACK_TYPE_USER);
+    expect_on_authenticator_authenticate(4);
+    _messageDispatcher->ExecutePendingActions();
+
+    EXPECT_EQ(_persistentData->GetActiveBridge()->GetApiversion(), "1.22.0");
+    EXPECT_TRUE(_persistentData->GetActiveBridge()->GetIsUsingSsl());
+}

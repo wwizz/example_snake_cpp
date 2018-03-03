@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -9,19 +9,20 @@
 #include <huestream/common/data/Bridge.h>
 
 #include <memory>
+#include <string>
 
 namespace huestream {
 
         class IBasicGroupLightController {
         public:
             /**
-            type of light presets when not streaming
-            */
+             type of light presets when not streaming
+             */
             enum LightPreset {
-                LIGHT_PRESET_RELAX,       ///< preset for relaxing
-                LIGHT_PRESET_READ,        ///< preset for reading
-                LIGHT_PRESET_CONCENTRATE, ///< preset for concentrating
-                LIGHT_PRESET_ENERGIZE     ///< preset for energizing
+                LIGHT_PRESET_RELAX,        ///< preset for relaxing
+                LIGHT_PRESET_READ,         ///< preset for reading
+                LIGHT_PRESET_CONCENTRATE,  ///< preset for concentrating
+                LIGHT_PRESET_ENERGIZE      ///< preset for energizing
             };
 
             virtual ~IBasicGroupLightController() {}

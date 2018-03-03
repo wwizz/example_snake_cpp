@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -27,9 +27,18 @@ std::string SerializeJson(const JSONNode &j) {
 
     StreamStarter::~StreamStarter() {}
 
-    bool StreamStarter::Start(bool force) {
+    bool StreamStarter::StartStream(ActivationOverrideLevel overrideLevel) {
+        auto force = (overrideLevel != ACTIVATION_OVERRIDELEVEL_NEVER);
         auto result = Execute(true);
         if (!result && _bridge->IsBusy() && force) {
+            auto groupsOwnedByOtherClient = _bridge->GetGroupsOwnedByOtherClient();
+            if (overrideLevel == ACTIVATION_OVERRIDELEVEL_ALWAYS && groupsOwnedByOtherClient->size() > 0) {
+                auto g = groupsOwnedByOtherClient->at(0);
+                if (DeactivateGroup(g->GetId())) {
+                    g->SetActive(false);
+                    g->SetOwner("");
+                }
+            }
             Execute(false);
             result = Execute(true);
         }
@@ -42,15 +51,37 @@ std::string SerializeJson(const JSONNode &j) {
         return result;
     }
 
+    bool StreamStarter::Start(bool force) {
+        auto overrideLevel = force ? ACTIVATION_OVERRIDELEVEL_SAMEGROUP : ACTIVATION_OVERRIDELEVEL_NEVER;
+        return StartStream(overrideLevel);
+    }
+
     void StreamStarter::Stop() {
-        if (Execute(false)) {
+        if (Execute(false) && _bridge->IsValidGroupSelected()) {
             _bridge->GetGroup()->SetActive(false);
+            _bridge->GetGroup()->SetOwner("");
         }
+    }
+
+    bool StreamStarter::DeactivateGroup(std::string groupId) {
+        auto url = _bridge->GetBaseUrl() + "groups/" + groupId;
+        if (!Execute(url, false)) {
+            return false;
+        }
+        auto group = _bridge->GetGroupById(groupId);
+        if (group != nullptr) {
+            group->SetActive(false);
+            group->SetOwner("");
+        }
+        return true;
     }
 
     bool StreamStarter::Execute(bool activate) {
         auto url = _bridge->GetSelectedGroupUrl();
+        return Execute(url, activate);
+    }
 
+    bool StreamStarter::Execute(std::string url, bool activate) {
         JSONNode streamNode;
         streamNode.set_name("stream");
         streamNode.push_back(JSONNode("active", activate));
@@ -59,6 +90,7 @@ std::string SerializeJson(const JSONNode &j) {
         groupNode.push_back(streamNode);
         auto data = SerializeJson(groupNode);
         auto req = std::make_shared<HttpRequestInfo>(HTTP_REQUEST_PUT, url, data);
+        req->SetEnableSslVerification(false);
         _http->Execute(req);
 
         return CheckForErrors(req);

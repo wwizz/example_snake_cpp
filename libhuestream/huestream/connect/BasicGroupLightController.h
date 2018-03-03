@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -8,6 +8,11 @@
 
 #include <huestream/common/http/IHttpClient.h>
 #include <huestream/connect/IBasicGroupLightController.h>
+
+#include <memory>
+#include <string>
+#include <map>
+#include <tuple>
 
 namespace huestream {
 
@@ -34,6 +39,7 @@ namespace huestream {
 
             HttpClientPtr _http;
             BridgePtr _bridge;
+            std::shared_ptr<support::HttpRequest> _request;
             std::mutex _mutex;
 
             std::string getBridgeUrl();

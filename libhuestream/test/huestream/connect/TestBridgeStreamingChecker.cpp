@@ -1,5 +1,5 @@
 #include <huestream/connect/BridgeStreamingChecker.h>
-#include <test/huestream/_mock/MockFullConfigRetriever.h>
+#include <test/huestream/_mock/MockConfigRetriever.h>
 
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
@@ -25,7 +25,7 @@ class TestBridgeStreamingChecker : public testing::Test {
   }
 
   void InitBridgeStateChecker() {
-      _mockFullConfigRetriever = std::shared_ptr<MockFullConfigRetriever>(new MockFullConfigRetriever());
+      _mockFullConfigRetriever = std::shared_ptr<MockConfigRetriever>(new MockConfigRetriever());
       _bridgeStreamingChecker = std::make_shared<BridgeStreamingChecker>(std::static_pointer_cast<IFullConfigRetriever>(_mockFullConfigRetriever));
       _bridgeStreamingChecker->SetFeedbackMessageCallback([this](const huestream::FeedbackMessage &message){
         _messages.push_back(message);
@@ -69,6 +69,7 @@ class TestBridgeStreamingChecker : public testing::Test {
 
   static void InitGroup(GroupPtr group, std::string nr) {
       group->SetId(nr);
+      group->SetName("group " + nr);
       group->AddLight("1", 0.1, 0.1, "L1", "LTC001");
       group->AddLight("2", 0.2, 0.2, "L2", "LTC001");
   }
@@ -134,7 +135,7 @@ class TestBridgeStreamingChecker : public testing::Test {
   BridgePtr _currentBridge;
   BridgePtr _actualBridge;
   BridgeSettingsPtr _bridgeSettings;
-  std::shared_ptr<MockFullConfigRetriever> _mockFullConfigRetriever;
+  std::shared_ptr<MockConfigRetriever> _mockFullConfigRetriever;
   std::shared_ptr<BridgeStreamingChecker> _bridgeStreamingChecker;
   std::vector<FeedbackMessage> _messages;
 
@@ -144,14 +145,6 @@ TEST_F(TestBridgeStreamingChecker, WhenCurrentStateBridgeNotConnectable_CheckDoe
     _currentBridge->SetIsAuthorized(false);
     Expect_FullConfigRetriever_Execute_Never();
     _bridgeStreamingChecker->Check(_currentBridge);
-}
-
-TEST_F(TestBridgeStreamingChecker, WhenCurrentStateBridgeHasNoGroupSelected_NoLightsUpdatedFeedbackMessage) {
-    _currentBridge->SetSelectedGroup("");
-    _actualBridge->GetGroups()->at(0)->GetLights()->pop_back();
-    Expect_FullConfigRetriever_Execute_Once();
-    _bridgeStreamingChecker->Check(_currentBridge);
-    EXPECT_EQ(_messages.size(), 0);
 }
 
 TEST_F(TestBridgeStreamingChecker, WhenCurrentStateBridgeNotStreaming_NoStreamingDisconnectedFeedbackMessage) {
@@ -180,6 +173,8 @@ TEST_F(TestBridgeStreamingChecker, WhenNotSelectedGroupChanges_NoFeedbackMessage
 TEST_F(TestBridgeStreamingChecker, WhenRetrieverFails_BRIDGE_DISCONNECTED) {
     _currentBridge->GetGroup()->SetActive(false);
     _currentBridge->GetGroup()->SetOwner("");
+    _actualBridge->GetGroup()->SetActive(false);
+    _actualBridge->GetGroup()->SetOwner("");
     _actualBridge->SetIsValidIp(false);
     Expect_FullConfigRetriever_Execute_Once();
     _bridgeStreamingChecker->Check(_currentBridge);
@@ -195,10 +190,10 @@ TEST_F(TestBridgeStreamingChecker, WhenRetrieverFails_STREAMING_DISCONNECTED_BRI
     ExpectTwoMessagesOfType(FeedbackMessage::ID_STREAMING_DISCONNECTED, FeedbackMessage::ID_BRIDGE_DISCONNECTED);
 }
 
-TEST_F(TestBridgeStreamingChecker, WhenGroupDeleted_STREAMING_DISCONNECTED) {
+TEST_F(TestBridgeStreamingChecker, WhenCurrentGroupDeleted_STREAMING_DISCONNECTED) {
     _actualBridge->DeleteGroup("1");
-     ExecuteCheckAndExpectTwoFeedbackMessagesOfType(FeedbackMessage::ID_STREAMING_DISCONNECTED,
-         FeedbackMessage::ID_GROUPLIST_UPDATED);
+    ExecuteCheckAndExpectThreeFeedbackMessagesOfType(FeedbackMessage::ID_STREAMING_DISCONNECTED,
+        FeedbackMessage::ID_GROUPLIST_UPDATED, FeedbackMessage::ID_LIGHTS_UPDATED);
 }
 
 TEST_F(TestBridgeStreamingChecker, WhenRetrieverActiveFalse_STREAMING_DISCONNECTED) {
@@ -208,11 +203,13 @@ TEST_F(TestBridgeStreamingChecker, WhenRetrieverActiveFalse_STREAMING_DISCONNECT
 
 TEST_F(TestBridgeStreamingChecker, WhenRetrieverOtherUser_STREAMING_DISCONNECTED) {
     _actualBridge->GetGroups()->at(0)->SetOwner("OTHER_USER");
-    ExecuteCheckAndExpectOneFeedbackMessageOfType(FeedbackMessage::ID_STREAMING_DISCONNECTED);
+    ExecuteCheckAndExpectTwoFeedbackMessagesOfType(FeedbackMessage::ID_STREAMING_DISCONNECTED, FeedbackMessage::ID_GROUPLIST_UPDATED);
 }
 
 TEST_F(TestBridgeStreamingChecker, WhenRetrieverConnected_BRIDGE_CONNECTED) {
     _currentBridge->SetIsValidIp(false);
+    _currentBridge->GetGroups()->at(0)->SetActive(false);
+    _actualBridge->GetGroups()->at(0)->SetActive(false);
     ExecuteCheckAndExpectOneFeedbackMessageOfType(FeedbackMessage::ID_BRIDGE_CONNECTED);
 }
 
@@ -245,6 +242,24 @@ TEST_F(TestBridgeStreamingChecker, WhenRetrieverLightOrderChanges_LIGHTS_UPDATED
     ExecuteCheckAndExpectOneFeedbackMessageOfType(FeedbackMessage::ID_LIGHTS_UPDATED);
 }
 
+TEST_F(TestBridgeStreamingChecker, WhenRetrieverGroupSelected_LIGHTS_UPDATED_GROUP_LIGHTSTATE_UPDATED) {
+    _currentBridge->GetGroups()->at(0)->SetActive(false);
+    _currentBridge->GetGroups()->at(0)->SetOwner("");
+    _currentBridge->SetSelectedGroup("");
+    _actualBridge->GetGroups()->at(0)->SetActive(false);
+    _actualBridge->GetGroups()->at(0)->SetOwner("");
+    ExecuteCheckAndExpectTwoFeedbackMessagesOfType(FeedbackMessage::ID_LIGHTS_UPDATED,
+        FeedbackMessage::ID_GROUP_LIGHTSTATE_UPDATED);
+}
+
+TEST_F(TestBridgeStreamingChecker, WhenRetrieverGroupSelectedAndStreaming_STREAMING_CONNECTED_GROUPLIST_UPDATED_LIGHTS_UPDATED) {
+    _currentBridge->GetGroups()->at(0)->SetActive(false);
+    _currentBridge->GetGroups()->at(0)->SetOwner("");
+    _currentBridge->SetSelectedGroup("");
+    ExecuteCheckAndExpectThreeFeedbackMessagesOfType(FeedbackMessage::ID_STREAMING_CONNECTED,
+        FeedbackMessage::ID_GROUPLIST_UPDATED, FeedbackMessage::ID_LIGHTS_UPDATED);
+}
+
 TEST_F(TestBridgeStreamingChecker, WhenRetrieverGroupRemoved_GROUPLIST_UPDATED) {
     _actualBridge->DeleteGroup("2");
     ExecuteCheckAndExpectOneFeedbackMessageOfType(FeedbackMessage::ID_GROUPLIST_UPDATED);
@@ -260,6 +275,11 @@ TEST_F(TestBridgeStreamingChecker, WhenRetrieverGroupAddedAndRemoved_GROUPLIST_U
     ExecuteCheckAndExpectOneFeedbackMessageOfType(FeedbackMessage::ID_GROUPLIST_UPDATED);
 }
 
+TEST_F(TestBridgeStreamingChecker, WhenRetrieverGroupNameChanged_GROUPLIST_UPDATED) {
+    _actualBridge->GetGroups()->at(1)->SetName("newname");
+    ExecuteCheckAndExpectOneFeedbackMessageOfType(FeedbackMessage::ID_GROUPLIST_UPDATED);
+}
+
 TEST_F(TestBridgeStreamingChecker, WhenRetrieverOtherGroupActiveChanged_GROUPLIST_UPDATED) {
     _currentBridge->GetGroups()->at(0)->SetActive(false);
     _currentBridge->GetGroups()->at(0)->SetOwner("");
@@ -267,6 +287,18 @@ TEST_F(TestBridgeStreamingChecker, WhenRetrieverOtherGroupActiveChanged_GROUPLIS
     _actualBridge->GetGroups()->at(0)->SetOwner("");
     _actualBridge->GetGroups()->at(1)->SetActive(true);
     _actualBridge->GetGroups()->at(1)->SetOwner("test");
+    ExecuteCheckAndExpectOneFeedbackMessageOfType(FeedbackMessage::ID_GROUPLIST_UPDATED);
+}
+
+TEST_F(TestBridgeStreamingChecker, WhenRetrieverOtherGroupOwnerChanged_GROUPLIST_UPDATED) {
+    _currentBridge->GetGroups()->at(0)->SetActive(false);
+    _currentBridge->GetGroups()->at(0)->SetOwner("");
+    _currentBridge->GetGroups()->at(1)->SetActive(true);
+    _currentBridge->GetGroups()->at(1)->SetOwner("aUser");
+    _actualBridge->GetGroups()->at(0)->SetActive(false);
+    _actualBridge->GetGroups()->at(0)->SetOwner("");
+    _actualBridge->GetGroups()->at(1)->SetActive(true);
+    _actualBridge->GetGroups()->at(1)->SetOwner("anOtherUser");
     ExecuteCheckAndExpectOneFeedbackMessageOfType(FeedbackMessage::ID_GROUPLIST_UPDATED);
 }
 
@@ -279,6 +311,8 @@ TEST_F(TestBridgeStreamingChecker, WhenRetrieverLightAndGroupAdded_Two_Messages)
 
 TEST_F(TestBridgeStreamingChecker, WhenRetrieverLightAndGroupAddedAndConnected_Three_Messages) {
     _currentBridge->SetIsValidIp(false);
+    _currentBridge->GetGroups()->at(0)->SetActive(false);
+    _actualBridge->GetGroups()->at(0)->SetOwner("anOtherUser");
     _actualBridge->GetGroups()->at(0)->AddLight("4", 0.4, 0.4, "", "");
     _actualBridge->GetGroups()->push_back(std::make_shared<Group>());
     ExecuteCheckAndExpectThreeFeedbackMessagesOfType(FeedbackMessage::ID_BRIDGE_CONNECTED,

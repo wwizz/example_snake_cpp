@@ -22,7 +22,7 @@ if(NOT EXISTS ${LIBRARY_PATH})
 
     ExternalProject_Add(${EXTERNAL_DEPENDENCY}
         PREFIX ${EXTERNAL_LIBRARIES_BUILD_PATH}
-        DOWNLOAD_COMMAND ${CMAKE_COMMAND} -DREFERENCE=${GIT_REFERENCE} -DREPO=https://github.com/ARMmbed/mbedtls.git -DBRANCH=mbedtls-2.4.0 -DSOURCE_DIR=${EXTERNAL_LIBRARIES_SOURCE_PATH}/mbedtls -DPATCH=mbedtls.patch -P ${CMAKE_CURRENT_LIST_DIR}/CloneRepository.cmake
+        DOWNLOAD_COMMAND ${CMAKE_COMMAND} -DREFERENCE=${GIT_REFERENCE} -DREPO=${mbedtls_URL} -DBRANCH=${mbedtls_VERSION} -DSOURCE_DIR=${EXTERNAL_LIBRARIES_SOURCE_PATH}/mbedtls -DPATCH=mbedtls.patch -P ${CMAKE_CURRENT_LIST_DIR}/CloneRepository.cmake
         UPDATE_COMMAND ""
         SOURCE_DIR "${EXTERNAL_LIBRARIES_SOURCE_PATH}/mbedtls"
         CMAKE_ARGS ${COMMON_ARGS} -DUSE_STATIC_MBEDTLS_LIBRARY=ON -DUSE_SHARED_MBEDTLS_LIBRARY=OFF -DENABLE_TESTING=OFF -DENABLE_PROGRAMS=OFF
@@ -34,3 +34,7 @@ endif(NOT EXISTS ${LIBRARY_PATH})
 expose_external_library()
 expose_additional_external_library(mbedx509 mbedcrypto)
 expose_additional_external_library(mbedtls mbedx509)
+
+if(WIN32)
+    set_property(TARGET mbedtls APPEND PROPERTY INTERFACE_LINK_LIBRARIES iphlpapi ws2_32)
+endif(WIN32)

@@ -1,5 +1,5 @@
 /*******************************************************************************
-Copyright (C) 2017 Philips Lighting Holding B.V.
+Copyright (C) 2018 Philips Lighting Holding B.V.
 All Rights Reserved.
 ********************************************************************************/
 
@@ -14,11 +14,13 @@ namespace huestream {
 
 class IBridgeStreamingChecker {
 public:
+    virtual ~IBridgeStreamingChecker() = default;
+
     virtual void Check(BridgePtr bridge) = 0;
     virtual void SetFeedbackMessageCallback(std::function<void(const huestream::FeedbackMessage &)> callback) = 0;
 };
 
-typedef std::shared_ptr<IBridgeStreamingChecker> BridgeStateCheckerPtr;
+using BridgeStateCheckerPtr = std::shared_ptr<IBridgeStreamingChecker>;
 }  // namespace huestream
 
 #endif  // HUESTREAM_CONNECT_IBRIDGESTREAMINGCHECKER_H_

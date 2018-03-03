@@ -1,81 +1,43 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
 #ifndef HUESTREAM_HUESTREAM_H_
 #define HUESTREAM_HUESTREAM_H_
 
-#include <huestream/config/Config.h>
-#include <huestream/common/data/Bridge.h>
-#include <huestream/common/data/Group.h>
-#include <huestream/effect/effects/base/Effect.h>
-#include <huestream/connect/FeedbackMessage.h>
-#include <huestream/common/serialize/SerializerHelper.h>
-#include <huestream/common/time/ITimeManager.h>
-#include <huestream/common/language/IMessageTranslator.h>
-#include <huestream/connect/Connect.h>
-#include <huestream/connect/IBridgeStorageAccessor.h>
-#include <huestream/connect/IMessageDispatcher.h>
-#include <huestream/connect/ConnectionMonitor.h>
-#include <huestream/connect/IBasicGroupLightController.h>
-#include <huestream/effect/Mixer.h>
-#include <huestream/stream/Stream.h>
-#include <huestream/connect/ConnectionFlow.h>
-#include <huestream/connect/IFeedbackMessageHandler.h>
-#include <huestream/effect/lightscript/LightScript.h>
-#include <huestream/HueStreamFactories.h>
-#include <util/Factory.h>
-
-#include <edtls/wrapper/mbedtls/EntropyProviderBase.h>
-
 #include <memory>
 #include <string>
-#include "connect/BasicGroupLightController.h"
+
+#include "huestream/IHueStream.h"
+#include "huestream/config/Config.h"
+#include "huestream/common/data/Bridge.h"
+#include "huestream/common/data/Group.h"
+#include "huestream/effect/effects/base/Effect.h"
+#include "huestream/connect/FeedbackMessage.h"
+#include "huestream/common/serialize/SerializerHelper.h"
+#include "huestream/common/time/ITimeManager.h"
+#include "huestream/common/language/IMessageTranslator.h"
+#include "huestream/connect/Connect.h"
+#include "huestream/connect/IBridgeStorageAccessor.h"
+#include "huestream/connect/IMessageDispatcher.h"
+#include "huestream/connect/ConnectionMonitor.h"
+#include "huestream/connect/IBasicGroupLightController.h"
+#include "huestream/effect/Mixer.h"
+#include "huestream/stream/Stream.h"
+#include "huestream/connect/ConnectionFlow.h"
+#include "huestream/connect/IFeedbackMessageHandler.h"
+#include "huestream/effect/lightscript/LightScript.h"
+#include "huestream/HueStreamFactories.h"
+#include "support/util/Factory.h"
 
 namespace huestream {
 
-typedef std::function<void(const FeedbackMessage &message)> FeedbackMessageCallback;
-
-class Config;
-typedef std::shared_ptr<Config> ConfigPtr;
-
-class IConnect;
-typedef std::shared_ptr<IConnect> ConnectPtr;
-
-class HueStream;
-typedef shared_ptr<HueStream> HueStreamPtr;
-
-typedef huesdk_lib::Factory<huestream::BridgeStorageAccessorPtr, const std::string&, huestream::BridgeSettingsPtr> BridgeStorageAccessorFactory;
-typedef huesdk_lib::Factory<huestream::MixerPtr> MixerFactory;
-typedef huesdk_lib::Factory<huestream::MessageTranslatorPtr, std::string> MessageTranslatorFactory;
-typedef huesdk_lib::Factory<EntropyProviderBasePtr> EntropyProviderFactory;
-typedef huesdk_lib::Factory<ConnectPtr, HttpClientPtr, MessageDispatcherPtr, BridgeSettingsPtr, AppSettingsPtr, StreamPtr, BridgeStorageAccessorPtr> ConnectFactory;
-typedef huesdk_lib::Factory<StreamPtr, StreamSettingsPtr, AppSettingsPtr, TimeManagerPtr, ConnectorPtr> HueStreamFactory;
-typedef huesdk_lib::Factory<HttpClientPtr> HttpClientFactory;
-typedef huesdk_lib::Factory<ConnectionMonitorPtr, HttpClientPtr, AppSettingsPtr> ConnectionMonitorFactory;
-typedef huesdk_lib::Factory<huestream::MixerPtr> MixerFactory;
-typedef huesdk_lib::Factory<huestream::TimeManagerPtr> TimeManagerFactory;
-typedef huesdk_lib::Factory<huestream::MessageDispatcherPtr> MessageDispatcherFactory;
-typedef huesdk_lib::Factory<huestream::ConnectorPtr, ConfigPtr> ConnectorFactory;
-typedef huesdk_lib::Factory<huestream::BasicGroupLightControllerPtr, HttpClientPtr> GroupControllerFactory;
-
-
-class ILightStateChangedHandler {
- public:
-    ILightStateChangedHandler() = default;
-    virtual ~ILightStateChangedHandler() = default;
-
-    virtual void OnLightStateUpdated(LightListPtr lights) = 0;
-};
-
-typedef std::shared_ptr<ILightStateChangedHandler> LightStateChangedHandlerPtr;
-typedef std::shared_ptr<IFeedbackMessageHandler> FeedbackMessageHandlerPtr;
 
 /**
  main huestream library facade which aggregates the connect, stream and effect components
  */
-class HueStream {
+class HueStream : public IHueStream {
  public:
     /**
      constructor
@@ -89,30 +51,28 @@ class HueStream {
     HueStream(ConfigPtr config,
               HttpClientPtr httpClient);
 
-
-
     /**
-     destructor
+     * destructor
      */
     virtual ~HueStream();
 
     /**
      Get the current config
      */
-    ConfigPtr GetConfig();
+    ConfigPtr GetConfig() override;
 
 
     /**
      set object which handles feedback from the library
      @param handler Reference to object which handles feedback from the library
      */
-    virtual void RegisterFeedbackHandler(FeedbackMessageHandlerPtr handler);
+    void RegisterFeedbackHandler(FeedbackMessageHandlerPtr handler) override;
 
     /**
      set function which handles feedback from the library
      @param callback Function which handles feedback from the library
      */
-    virtual void RegisterFeedbackCallback(FeedbackMessageCallback callback);
+    void RegisterFeedbackCallback(FeedbackMessageCallback callback) override;
 
     /**
      set object which handles light state update events from the library. HueStream will call OnLightStateUpdate(  )
@@ -120,248 +80,263 @@ class HueStream {
      Use this method to render the output light states.
      @param handler Reference to object which handles feedback from the library
      */
-    virtual void RegisterLightStateUpdatedHandler(LightStateChangedHandlerPtr handler);
+    void RegisterLightStateUpdatedHandler(LightStateChangedHandlerPtr handler) override;
 
     /**
      if a valid bridge is stored connect to it, else discover a new bridge and connect to it (blocking execution)
      */
-    virtual void ConnectBridge();
+    void ConnectBridge() override;
 
     /**
      if a valid bridge is stored connect to it, else discover a new bridge and connect to it (non blocking execution)
+     @note this is the standard/default connect procedure which should be used for most applications
      */
-    virtual void ConnectBridgeAsync();
+    void ConnectBridgeAsync() override;
 
     /**
      if a valid bridge is stored connect to it, else check if a valid bridge is on the network but don't connect yet (blocking execution)
      */
-    virtual void ConnectBridgeBackground();
+    void ConnectBridgeBackground() override;
 
     /**
      if a valid bridge is stored connect to it, else check if a valid bridge is on the network but don't connect yet (non blocking execution)
+     @note this can used in applications where a Hue system is an optional addition, to notify only users who has a valid Hue bridge
      */
-    virtual void ConnectBridgeBackgroundAsync();
+    void ConnectBridgeBackgroundAsync() override;
 
     /**
      connect to a bridge with manually set ip address (blocking execution)
      @param ipAddress Ip address of the bridge to connect to
      */
-    virtual void ConnectBridgeManualIp(const std::string &ipAddress);
+    void ConnectBridgeManualIp(const std::string &ipAddress) override;
 
     /**
      connect to a bridge with manually set ip address (non blocking execution)
+     @note this is normally used only as a backup when the normal connect call is unable to discover a bridge
      @param ipAddress Ip address of the bridge to connect to
      */
-    virtual void ConnectBridgeManualIpAsync(const std::string &ipAddress);
+    void ConnectBridgeManualIpAsync(const std::string &ipAddress) override;
 
     /**
      connect to a bridge with manually set ip address, username and clientkey (blocking execution)
      @param bridge Bridge object with a valid ip address, username and clientkey set
      */
-    virtual void ConnectManualBridgeInfo(BridgePtr bridge);
+    void ConnectManualBridgeInfo(BridgePtr bridge) override;
 
     /**
      connect to a bridge with manually set ip address, username and clientkey (non blocking execution)
+     @note this can be used to manually switch to another bridge from the loaded list of known bridges
      @param bridge Bridge object with a valid ip address, username and clientkey set
      */
-    virtual void ConnectManualBridgeInfoAsync(BridgePtr bridge);
+    void ConnectManualBridgeInfoAsync(BridgePtr bridge) override;
 
     /**
      connect to a new bridge, even if a valid bridge is already active (blocking execution)
      */
-    virtual void ConnectNewBridge();
+    void ConnectNewBridge() override;
 
     /**
      connect to a new bridge, even if a valid bridge is already active (non blocking execution)
+     @note optional for the case when the user already has an ative bridge connection but explicitely wants to discover a new one
      */
-    virtual void ConnectNewBridgeAsync();
+    void ConnectNewBridgeAsync() override;
 
     /**
      select entertainment group to use (blocking execution)
      @param group Entertainment group to use
      */
-    virtual void SelectGroup(GroupPtr group);
+    void SelectGroup(GroupPtr group) override;
 
     /**
      select entertainment group to use (non blocking execution)
      @param group Entertainment group to use
      */
-    virtual void SelectGroupAsync(GroupPtr group);
+    void SelectGroupAsync(GroupPtr group) override;
 
     /**
      select entertainment group to use by id (blocking execution)
      @param id Id of the entertainment group to use
      */
-    virtual void SelectGroup(std::string id);
+    void SelectGroup(std::string id) override;
 
     /**
      select entertainment group to use by id (non blocking execution)
      @param id Id of the entertainment group to use
      */
-    virtual void SelectGroupAsync(std::string id);
+    void SelectGroupAsync(std::string id) override;
 
     /**
      start streaming (blocking execution)
      */
-    virtual void Start();
+    void Start() override;
 
     /**
      start streaming (non blocking execution)
      */
-    virtual void StartAsync();
+    void StartAsync() override;
 
     /**
      delete stored information of current bridge (blocking execution)
      */
-    virtual void ResetBridgeInfo();
+    void ResetBridgeInfo() override;
 
     /**
      delete stored information of current bridge (non blocking execution)
      */
-    virtual void ResetBridgeInfoAsync();
+    void ResetBridgeInfoAsync() override;
 
     /**
      delete all stored bridge information (blocking execution)
      */
-    virtual void ResetAllPersistentData();
+    void ResetAllPersistentData() override;
 
     /**
      delete all stored bridge information (non blocking execution)
      */
-    virtual void ResetAllPersistentDataAsync();
+    void ResetAllPersistentDataAsync() override;
 
     /**
      load stored bridge information (blocking execution)
      */
-    virtual void LoadBridgeInfo();
+    void LoadBridgeInfo() override;
 
     /**
      load stored bridge information (non blocking execution)
      */
-    virtual void LoadBridgeInfoAsync();
+    void LoadBridgeInfoAsync() override;
 
     /**
      abort connection procedure (blocking execution)
      */
-    virtual void AbortConnecting();
+    void AbortConnecting() override;
 
     /**
      abort connection procedure (non blocking execution)
      */
-    virtual void AbortConnectingAsync();
+    void AbortConnectingAsync() override;
 
     /**
      get the result of the last connection procedure
      @return result of the last connection procedure
      */
-    virtual ConnectResult GetConnectionResult();
+    ConnectResult GetConnectionResult() override;
 
     /**
      check if the currently loaded bridged is correctly configured for streaming
      @return whether a bridge is loaded which is correctly configured for streaming
      */
-    virtual bool IsStreamableBridgeLoaded();
+    bool IsStreamableBridgeLoaded() override;
 
     /**
      check if the currently loaded bridged is being streamed to
      @return whether if the currently loaded bridged is being streamed to
      */
-    virtual bool IsBridgeStreaming();
+    bool IsBridgeStreaming() override;
 
     /**
      get the currently loaded bridge
      @return reference to currently loaded bridge object
      */
-    virtual BridgePtr GetLoadedBridge();
+    BridgePtr GetLoadedBridge() override;
 
     /**
      get the status of the currently loaded bridge
      @return status of the currently loaded bridge
      */
-    virtual BridgeStatus GetLoadedBridgeStatus();
+    BridgeStatus GetLoadedBridgeStatus() override;
 
     /**
      get the list of entertainment groups on the currently loaded bridge
      @return list of entertainment groups on the currently loaded bridge
      */
-    virtual GroupListPtr GetLoadedBridgeGroups();
+    GroupListPtr GetLoadedBridgeGroups() override;
+
+    /**
+     get the list of all loaded known bridges that have been authorized for streaming
+     @return list of all loaded known bridges that have been authorized for streaming
+     */
+    BridgeListPtr GetKnownBridges() override;
 
     /**
      render a single frame
      @note only required if useRenderThread option is disabled
      */
-    virtual void RenderSingleFrame();
+    void RenderSingleFrame() override;
 
     /**
      stop streaming (blocking execution)
      */
-    virtual void Stop();
+    void Stop() override;
 
     /**
      stop streaming (non blocking execution)
      */
-    virtual void StopAsync();
+    void StopAsync() override;
 
     /**
      lock the engine to be able to add and/or modify effects
      @note required if useRenderThread option is enabled
      */
-    virtual void LockMixer();
+    void LockMixer() override;
 
     /**
      unlock the engine for rendering
      @note required if useRenderThread option is enabled
      */
-    virtual void UnlockMixer();
+    void UnlockMixer() override;
 
     /**
      add a single effect to the engine
      @param newEffect Reference to effect to be added
      */
-    virtual void AddEffect(EffectPtr newEffect);
+    void AddEffect(EffectPtr newEffect) override;
 
     /**
      add a full light script to the engine
      @param script Reference to light script to be added
      */
-    virtual void AddLightScript(LightScriptPtr script);
+    void AddLightScript(LightScriptPtr script) override;
 
     /**
      get effect by name
      @param name Name of the effect to retrieve
      @return Reference to effect if found, else nullptr
      */
-    virtual EffectPtr GetEffectByName(const std::string &name);
+    EffectPtr GetEffectByName(const std::string &name) override;
 
     /**
      shut down the huestream module
      */
-    virtual void ShutDown();
+    void ShutDown() override;
 
     /**
      prepare the render engine for streaming
      @note mostly internal use: is automatically called as part of starting the stream
      */
-    virtual void PrepareMixer();
+    void PrepareMixer() override;
 
 
     /**
      Get the number of frames sent
      @note mostly internal use
      */
-    virtual int32_t GetStreamCounter();
+    int32_t GetStreamCounter() override;
 
     /**
      Change the streaming mode
      @note mostly internal use
      */
-    virtual void ChangeStreamingMode(StreamingMode mode);
+    void ChangeStreamingMode(StreamingMode mode) override;
 
+    /**
+    Get the effect mixer
+    */
+    MixerPtr GetMixer() override;
     /**
      Set the on state of selected entertainment group
      @note this only works when not streaming and a valid group is selected
      */
-    virtual void SetGroupOn(bool on);
+    void SetGroupOn(bool on) override;
 
     /**
      Set the brightness of selected entertainment group
@@ -369,7 +344,7 @@ class HueStream {
      @note this only works when not streaming and a valid group is selected
      @note do not update value more than twice per second
      */
-    virtual void SetGroupBrightness(double brightness);
+    void SetGroupBrightness(double brightness) override;
 
     /**
      Set the color of selected entertainment group
@@ -378,14 +353,14 @@ class HueStream {
      @note this only works when not streaming and a valid group is selected
      @note do not update value more than twice per second
      */
-    virtual void SetGroupColor(double x, double y);
+    void SetGroupColor(double x, double y) override;
 
     /**
      Set a default light preset on the selected entertainment group
      @param preset One of the Hue specified presets
      @note this only works when not streaming and a valid group is selected
      */
-    virtual void SetGroupPreset(BasicGroupLightController::LightPreset preset, bool excludeLightsWhichAreOff = false);
+    void SetGroupPreset(BasicGroupLightController::LightPreset preset, bool excludeLightsWhichAreOff = false) override;
 
     /**
      Set a custom light preset on the selected entertainment group
@@ -394,15 +369,18 @@ class HueStream {
      @param y Y-coordinate in CIE XY color space
      @note this only works when not streaming and a valid group is selected
      */
-    virtual void SetGroupPreset(double brightness, double x, double y, bool excludeLightsWhichAreOff = false);
+    void SetGroupPreset(double brightness, double x, double y, bool excludeLightsWhichAreOff = false) override;
 
     /**
      Set the scene of selected entertainment group
      @note this only works when not streaming and a valid group is selected
      */
-    virtual void SetGroupScene(const std::string &sceneTag);
+    void SetGroupScene(const std::string &sceneTag) override;
 
-    virtual TimeManagerPtr GetTimeManager();
+    /**
+     Get the time manager
+    */
+    TimeManagerPtr GetTimeManager() override;
 
  protected:
     HueStream(ConfigPtr config,
@@ -445,12 +423,11 @@ class HueStream {
     virtual void Render();
 
     ConfigPtr _config;
-    static HueStreamPtr _hueStream;
-
     FeedbackMessageHandlerPtr _handler;
     FeedbackMessageCallback _callback;
     HttpClientPtr _httpClient;
     ConnectionMonitorPtr _connectionMonitor;
+    BridgeListPtr _knownBridges;
     BasicGroupLightControllerPtr _groupController;
 
  PROP_DEFINE(HueStream, BridgePtr, activeBridge, ActiveBridge);

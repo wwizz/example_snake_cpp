@@ -22,7 +22,7 @@ public:
 
     MOCK_METHOD0(CreateAuthenticator, BridgeAuthenticatorPtr());
 
-    MOCK_METHOD1(CreateFullConfigRetriever, FullConfigRetrieverPtr(bool useForcedActivation));
+    MOCK_METHOD2(CreateConfigRetriever, ConfigRetrieverPtr(bool useForcedActivation, ConfigType configType));
 
     MOCK_METHOD0(GetMessageDispatcher, MessageDispatcherPtr());
 

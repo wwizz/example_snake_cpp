@@ -35,12 +35,12 @@ endif()
 set(INSTALL_INC_DIR_NAME include)
 set(INSTALL_DIR ${CMAKE_INSTALL_PREFIX})
 
-SET( CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG "${BUILD_DIR}")
-SET( CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE "${BUILD_DIR}")
-SET( CMAKE_LIBRARY_OUTPUT_DIRECTORY_DEBUG "${BUILD_DIR}")
-SET( CMAKE_LIBRARY_OUTPUT_DIRECTORY_RELEASE "${BUILD_DIR}")
-SET( CMAKE_ARCHIVE_OUTPUT_DIRECTORY_DEBUG "${BUILD_DIR}")
-SET( CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE "${BUILD_DIR}")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG "${BUILD_DIR}")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE "${BUILD_DIR}")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_DEBUG "${BUILD_DIR}")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_RELEASE "${BUILD_DIR}")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_DEBUG "${BUILD_DIR}")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE "${BUILD_DIR}")
 #============================================
 # External projects and cmake modules
 #============================================
@@ -58,7 +58,7 @@ include(PostInstall)
 enable_testing()
 set(CTEST_OUTPUT_ON_FAILURE 1)
 
-generate_build_info(${CMAKE_SOURCE_DIR})
+generate_build_info(${CMAKE_SOURCE_DIR}/huesdk)
 #============================================
 # CONFIGURATION OPTIONS
 #============================================
@@ -102,6 +102,10 @@ endif()
 # RTTI support
 if (NOT BUILD_WITH_RTTI)
     add_definitions(-DNO_RTTI)
+endif()
+
+if (NOT BUILD_WITH_EXCEPTIONS)
+    add_definitions(-D_HAS_EXCEPTIONS=0)
 endif()
 
 if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
@@ -175,7 +179,6 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
     # Exception support
     if (NOT BUILD_WITH_EXCEPTIONS)
         string(REGEX REPLACE "/EHsc" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-        add_definitions(-D_HAS_EXCEPTIONS=0)
     endif()
 
     # Specific code define for exporting DLLs
@@ -187,6 +190,16 @@ endif()
 #In this variable the shared libraries needed are collected and on windows
 # copied to output next the executable
 set(shared_libs "")
+
+#============================================
+# 3rd_party
+#============================================
+# Setup download information for 3rd party libraries
+include(SetupThirdParty)
+
+if (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/3rd_party/CMakeLists.txt)
+    add_subdirectory(3rd_party)
+endif()
 
 #============================================
 # libhuestream

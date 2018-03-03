@@ -26,11 +26,18 @@ public:
 class TestSequence : public testing::Test, public TestSerializeBase {
 private:
     std::shared_ptr<StubTimeProvider> _tp;
-    std::unique_ptr<TimeProviderProvider::Scope> _tpScope;
+    using ScopedtimeProviderProvider = support::ScopedProvider<TimeProviderPtr>;
+    ScopedtimeProviderProvider _tpScope;
+
 public:
+    TestSequence()
+      : _tp(std::make_shared<StubTimeProvider>()),
+        _tpScope(_tp),
+        _player(std::make_shared<Player>())
+    {}
+
     std::shared_ptr<Player> _player;
 protected:
-
     virtual void AddMillisecondsAndUpdateMarkers(long milliseconds) {
         _tp->AddMilliseconds(milliseconds);
         _player->UpdateMarkers();
@@ -46,10 +53,6 @@ protected:
     }
 
     virtual void SetUp() {
-        _tp = std::make_shared<StubTimeProvider>();
-        _tpScope = TimeProviderProvider::SetProviderMethodInThisScope([this]() -> TimeProviderPtr {return _tp;});
-        _player = std::make_shared<Player>();
-
         Serializable::SetObjectBuilder(std::make_shared<ObjectBuilder>(std::make_shared<BridgeSettings>()));
     }
 

@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -27,25 +27,22 @@ namespace huestream {
 PROP_IMPL(HueStream, BridgePtr, activeBridge, ActiveBridge);
 PROP_IMPL(HueStream, StreamRenderCallback, streamRenderCallback, StreamRenderCallback);
 
-HueStreamPtr HueStream::_hueStream;
-
 HueStream::HueStream(ConfigPtr config) :
     HueStream(std::move(config),
-              HttpClientFactory::Create()
-    ) {}
+              HttpClientFactory::create()) {}
 
 HueStream::HueStream(ConfigPtr config, HttpClientPtr httpClient) :
     HueStream(config,
               httpClient,
-              TimeManagerFactory::Create(),
-              ConnectionMonitorFactory::Create(httpClient, config->GetAppSettings()),
-              MixerFactory::Create(),
-              BridgeStorageAccessorFactory::Create(config->GetAppSettings()->GetBridgeFileName(),
+              TimeManagerFactory::create(),
+              ConnectionMonitorFactory::create(httpClient, config->GetAppSettings()),
+              MixerFactory::create(),
+              BridgeStorageAccessorFactory::create(config->GetAppSettings()->GetBridgeFileName(),
                                                    config->GetBridgeSettings()),
-              MessageDispatcherFactory::Create(),
-              MessageTranslatorFactory::Create(config->GetAppSettings()->GetLanguage()),
-              ConnectorFactory::Create(config),
-              GroupControllerFactory::Create(httpClient)
+              MessageDispatcherFactory::create(),
+              MessageTranslatorFactory::create(config->GetAppSettings()->GetLanguage()),
+              ConnectorFactory::create(config),
+              GroupControllerFactory::create(httpClient)
     ) {}
 
 HueStream::HueStream(ConfigPtr config,
@@ -68,7 +65,7 @@ HueStream::HueStream(ConfigPtr config,
               std::move(translator),
               connector,
               std::move(groupController),
-              HueStreamFactory::Create(config->GetStreamSettings(), config->GetAppSettings(), timeManager, connector)) {
+              HueStreamFactory::create(config->GetStreamSettings(), config->GetAppSettings(), timeManager, connector)) {
     }
 
 HueStream::HueStream(ConfigPtr config,
@@ -93,7 +90,7 @@ HueStream::HueStream(ConfigPtr config,
               connector,
               groupController,
               stream,
-              ConnectFactory::Create(httpClient, dispatcher, config->GetBridgeSettings(), config->GetAppSettings(), stream, storageAccessor)) {
+              ConnectFactory::create(httpClient, dispatcher, config->GetBridgeSettings(), config->GetAppSettings(), stream, storageAccessor)) {
 }
 
 HueStream::HueStream(ConfigPtr config,
@@ -108,23 +105,23 @@ HueStream::HueStream(ConfigPtr config,
                      BasicGroupLightControllerPtr groupController,
                      StreamPtr stream,
                      ConnectPtr connect):
-    
     _config(std::move(config)),
     _httpClient(std::move(httpClient)),
     _connectionMonitor(std::move(connectionMonitor)),
+    _knownBridges(std::make_shared<BridgeList>()),
+    _groupController(std::move(groupController)),
     _activeBridge(std::make_shared<Bridge>(_config->GetBridgeSettings())),
-    _streamRenderCallback(std::bind(&HueStream::Render, this)), 
+    _streamRenderCallback(std::bind(&HueStream::Render, this)),
     _storageAccessor(std::move(storageAccessor)),
     _dispatcher(std::move(dispatcher)),
     _translator(std::move(translator)),
     _timeManager(std::move(timeManager)),
     _connector(std::move(connector)),
-    _groupController(std::move(groupController)),
     _stream(std::move(stream)),
     _connect(std::move(connect)),
     _mixer(std::move(mixer)) {
     FeedbackMessage::SetTranslator(_translator);
-    TimeProviderProvider::SetProviderMethod([this]() -> TimeProviderPtr {return _timeManager;});
+    TimeProviderProvider::set(_timeManager);
     Serializable::SetObjectBuilder(std::make_shared<ObjectBuilder>(_config->GetBridgeSettings()));
 
     _connectionMonitor->SetFeedbackMessageCallback([this](const FeedbackMessage &message) {
@@ -140,8 +137,7 @@ HueStream::HueStream(ConfigPtr config,
     _stream->SetRenderCallback(_streamRenderCallback);
 }
 
-HueStream::~HueStream() {
-}
+HueStream::~HueStream() {}
 
 ConfigPtr HueStream::GetConfig() {
     return _config;
@@ -279,34 +275,43 @@ GroupListPtr HueStream::GetLoadedBridgeGroups() {
     return _activeBridge->GetGroups();
 }
 
+BridgeListPtr HueStream::GetKnownBridges() {
+    return _knownBridges;
+}
+
 void HueStream::NewFeedbackMessage(const FeedbackMessage &message) {
     _activeBridge = message.GetBridge();
 
-    //On finishing a user trigerred event or on a bridge monitor change event
+    if (message.GetId() == FeedbackMessage::ID_FINISH_LOADING_BRIDGE_CONFIGURED ||
+        message.GetId() == FeedbackMessage::ID_START_SAVING) {
+        _knownBridges = message.GetBridgeList();
+    }
+
+    // On finishing a user trigerred event or on a bridge monitor change event
     if (message.GetId() == FeedbackMessage::ID_USERPROCEDURE_FINISHED ||
         message.GetRequestType() == FeedbackMessage::REQUEST_TYPE_INTERNAL) {
-        //If bridge is streaming: mixer & stream components should be updated with new bridge data
+        // If bridge is streaming: mixer & stream components should be updated with new bridge data
         if (_activeBridge->IsStreaming()) {
             PrepareMixer();
         }
-        //Pass new activebridge to group light controller
+        // Pass new activebridge to group light controller
         _groupController->SetActiveBridge(_activeBridge);
-        //Dont monitor invalid bridges
+        // Dont monitor invalid bridges
         if (!_activeBridge->IsConnectable()) {
             _connectionMonitor->Stop();
-        //Poll regularly while streaming
+        // Poll regularly while streaming
         } else if (_activeBridge->IsStreaming()) {
             _connectionMonitor->Start(_activeBridge, _config->GetAppSettings()->GetMonitorIntervalStreamingMs());
-        //Poll slowly when not streaming
+        // Poll slowly when not streaming
         } else {
             _connectionMonitor->Start(_activeBridge, _config->GetAppSettings()->GetMonitorIntervalNotStreamingMs());
         }
-    //Dont monitor when connection procedure is ongoing
+    // Dont monitor when connection procedure is ongoing
     } else if (message.GetId() == FeedbackMessage::ID_USERPROCEDURE_STARTED) {
         _connectionMonitor->Stop();
     }
 
-    //Forward message to registered client
+    // Forward message to registered client
     if (_handler != nullptr) {
         _handler->NewFeedbackMessage(message);
     }
@@ -408,7 +413,11 @@ void HueStream::ChangeStreamingMode(StreamingMode mode) {
         return;
     }
     _config->SetStreamingMode(mode);
-    _connector = ConnectorFactory::Create(_config);
+    _connector = ConnectorFactory::create(_config);
+}
+
+MixerPtr HueStream::GetMixer() {
+    return _mixer;
 }
 
 TimeManagerPtr HueStream::GetTimeManager() {

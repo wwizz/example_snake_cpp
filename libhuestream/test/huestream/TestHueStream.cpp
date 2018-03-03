@@ -1,3 +1,8 @@
+/*******************************************************************************
+ Copyright (C) 2018 Philips Lighting Holding B.V.
+ All Rights Reserved.
+ ********************************************************************************/
+
 #include <huestream/config/ObjectBuilder.h>
 #include <huestream/HueStream.h>
 #include <test/huestream/_mock/MockBridge.h>
@@ -6,20 +11,21 @@
 #include <test/huestream/_mock/MockConnectionMonitor.h>
 #include <test/huestream/_stub/StubMessageDispatcher.h>
 #include <huestream/common/time/TimeManager.h>
+#include <huestream/common/time/TimeProviderProvider.h>
 #include <huestream/common/http/HttpClient.h>
 #include <test/huestream/_mock/MockTimeManager.h>
 #include <test/huestream/_mock/MockHttpClient.h>
 #include <test/huestream/_mock/MockConnector.h>
 #include <test/huestream/_mock/MockMixer.h>
 #include "gtest/gtest.h"
-#include "HueStreamTestFactories.h"
 
-#include <util/Factory.h>
-#include <test/huestream/_mock/MockBridgeStorageAccesser.h>
+#include <support/util/Factory.h>
+#include <test/huestream/_mock/MockBridgeStorageAccessor.h>
 #include <test/huestream/_mock/MockMessageTranslator.h>
 #include <test/huestream/_mock/MockBasicGroupLightController.h>
 
 using namespace huestream;
+using support::Factory;
 
 using ::testing::Return;
 using ::testing::_;
@@ -38,62 +44,68 @@ class LightStateChangedHandler: public ILightStateChangedHandler {
 };
 
 class TestHuestream : public testing::Test {
-
-
  protected:
-
     virtual void SetUp() {
-
         Serializable::SetObjectBuilder(std::make_shared<ObjectBuilder>(nullptr));
         _handler = std::make_shared<LightStateChangedHandler>();
 
         auto config = std::make_shared<Config>("test", "pc");
 
         _mockHttpClient = std::make_shared<MockHttpClient>();
-        HueStreamTestFactories<HttpClientPtr>::Override([this](){ return _mockHttpClient; });
+        Factory<IHttpClient>::set_factory_method([this](){
+            return support::make_unique<MockWrapperHttpClient>(_mockHttpClient);});
 
         _mockTimeManager = std::make_shared<MockTimeManager>();
-        HueStreamTestFactories<TimeManagerPtr>::Override([this](){ return _mockTimeManager; });
+        Factory<ITimeManager>::set_factory_method(
+                [this](){ return support::make_unique<MockWrapperTimeManager>(_mockTimeManager); });
 
         _mockConnectionMonitor = std::make_shared<MockConnectionMonitor>();
         EXPECT_CALL(*_mockConnectionMonitor, SetFeedbackMessageCallback(_)).Times(1).WillOnce(SaveArg<0>(&_mockConnectionMonitor->callback));
-        HueStreamTestFactories<ConnectionMonitorPtr, HttpClientPtr, AppSettingsPtr>::Override([this](){ return _mockConnectionMonitor; });
+
+        Factory<IConnectionMonitor, HttpClientPtr, AppSettingsPtr>::set_factory_method(
+                [this](){ return support::make_unique<MockWrapperConnectionMonitor>(_mockConnectionMonitor); });
 
         _mockMixer = std::make_shared<MockMixer>();
-        HueStreamTestFactories<MixerPtr>::Override([this](){ return _mockMixer; });
+        Factory<IMixer>::set_factory_method([this](){ return support::make_unique<MockWrapperMixer>(_mockMixer); });
 
-        _mockBridgeStorageAccesser = std::make_shared<MockBridgeStorageAccesser>();
-        HueStreamTestFactories<BridgeStorageAccessorPtr, const std::string &,BridgeSettingsPtr>::Override([this](){ return _mockBridgeStorageAccesser; });
+        _mockBridgeStorageAccesser = std::make_shared<MockBridgeStorageAccessor>();
+        Factory<IBridgeStorageAccessor, const std::string &,BridgeSettingsPtr>::set_factory_method(
+                [this](){ return support::make_unique<MockWrapperBridgeStorageAccessor>(_mockBridgeStorageAccesser); });
 
-        _dispatcher = std::make_shared<StubMessageDispatcher>();
-        HueStreamTestFactories<MessageDispatcherPtr>::Override([this](){ return _dispatcher; });
+        Factory<IMessageDispatcher>::set_factory_method(
+                [this](){ return support::make_unique<StubMessageDispatcher>(); });
 
         _mockMessageTranslator = std::make_shared<MockMessageTranslator>();
-        HueStreamTestFactories<MessageTranslatorPtr,std::string>::Override([this](){ return _mockMessageTranslator; });
+        Factory<IMessageTranslator, std::string>::set_factory_method(
+                [this](){ return support::make_unique<MockWrapperMessageTranslator>(_mockMessageTranslator); });
 
         _mockConnector = std::make_shared<MockConnector>();
-        HueStreamTestFactories<ConnectorPtr, ConfigPtr>::Override([this](){ return _mockConnector; });
+        Factory<IConnector, ConfigPtr>::set_factory_method(
+                [this](){ return support::make_unique<MockWrapperConnector>(_mockConnector); });
 
         _mockStream = std::make_shared<MockStream>();
-        HueStreamTestFactories<
-            StreamPtr,
+        Factory<
+            IStream,
             StreamSettingsPtr,
             AppSettingsPtr,
             TimeManagerPtr,
-            ConnectorPtr>::Override([this](){ return _mockStream; });
+            ConnectorPtr>::set_factory_method(
+                [this](){ return support::make_unique<MockWrapperStream>(_mockStream); });
 
         _mockConnect = std::make_shared<MockConnect>();
-        HueStreamTestFactories<ConnectPtr,
+        Factory<IConnect,
                                HttpClientPtr,
                                MessageDispatcherPtr,
                                BridgeSettingsPtr,
                                AppSettingsPtr,
                                StreamPtr,
-                               BridgeStorageAccessorPtr>::Override([this](){ return _mockConnect; });
+                               BridgeStorageAccessorPtr>::set_factory_method(
+                [this](){ return support::make_unique<MockWrapperConnect>(_mockConnect); });
         EXPECT_CALL(*_mockConnect, SetFeedbackMessageCallback(_)).Times(1).WillOnce(SaveArg<0>(&_mockConnect->callback));
 
         _mockGroupController = std::make_shared<MockBasicGroupLightController>();
-        HueStreamTestFactories<BasicGroupLightControllerPtr, HttpClientPtr>::Override([this]() { return _mockGroupController; });
+        Factory<IBasicGroupLightController, HttpClientPtr>::set_factory_method(
+                [this]() { return support::make_unique<MockWrapperBasicGroupLightController>(_mockGroupController); });
 
         huestream = std::make_shared<HueStream>(config);
     }
@@ -115,23 +127,23 @@ class TestHuestream : public testing::Test {
 
         huestream->ShutDown();
         Serializable::SetObjectBuilder(nullptr);
+
+        TimeProviderProvider::set(nullptr);
     }
- private:
 
  protected:
-    shared_ptr<HueStream> huestream;
-    shared_ptr<MockStream> _mockStream;
-    shared_ptr<LightStateChangedHandler> _handler;
-    shared_ptr<MockConnect> _mockConnect;
-    shared_ptr<MockConnectionMonitor> _mockConnectionMonitor;
-    shared_ptr<StubMessageDispatcher> _dispatcher;
-    shared_ptr<MockConnector> _mockConnector;
-    shared_ptr<MockHttpClient> _mockHttpClient;
-    shared_ptr<MockTimeManager> _mockTimeManager;
-    shared_ptr<MockMixer> _mockMixer;
-    shared_ptr<MockBridgeStorageAccesser> _mockBridgeStorageAccesser;
-    shared_ptr<MockMessageTranslator> _mockMessageTranslator;
-    shared_ptr<MockBasicGroupLightController> _mockGroupController;
+    std::shared_ptr<HueStream> huestream;
+    std::shared_ptr<MockStream> _mockStream;
+    std::shared_ptr<LightStateChangedHandler> _handler;
+    std::shared_ptr<MockConnect> _mockConnect;
+    std::shared_ptr<MockConnectionMonitor> _mockConnectionMonitor;
+    std::shared_ptr<MockConnector> _mockConnector;
+    std::shared_ptr<MockHttpClient> _mockHttpClient;
+    std::shared_ptr<MockTimeManager> _mockTimeManager;
+    std::shared_ptr<MockMixer> _mockMixer;
+    std::shared_ptr<MockBridgeStorageAccessor> _mockBridgeStorageAccesser;
+    std::shared_ptr<MockMessageTranslator> _mockMessageTranslator;
+    std::shared_ptr<MockBasicGroupLightController> _mockGroupController;
 
     BridgePtr CreateNotStreamingBridge() const {
         auto bridge = std::make_shared<Bridge>(std::make_shared<BridgeSettings>());
@@ -293,7 +305,7 @@ TEST_F(TestHuestream, Start) {
     auto bridge = std::make_shared<MockBridge>(std::make_shared<BridgeSettings>());
     huestream->SetActiveBridge(bridge);
 
-    EXPECT_CALL(*_mockConnect, StartStream(std::static_pointer_cast<IStream>(_mockStream)));
+    EXPECT_CALL(*_mockConnect, StartStream(_));
     EXPECT_CALL(*_mockConnect, WaitUntilReady());
 
     huestream->Start();
@@ -303,7 +315,7 @@ TEST_F(TestHuestream, StartAsync) {
     auto bridge = std::make_shared<MockBridge>(std::make_shared<BridgeSettings>());
     huestream->SetActiveBridge(bridge);
 
-    EXPECT_CALL(*_mockConnect, StartStream(std::static_pointer_cast<IStream>(_mockStream)));
+    EXPECT_CALL(*_mockConnect, StartStream(_));
 
     huestream->StartAsync();
 }
@@ -486,6 +498,22 @@ TEST_F(TestHuestream, NewFeedbackMessage_TYPE_INTERNAL_passes_bridge_to_group_co
     _mockConnect->callback(message);
 }
 
+TEST_F(TestHuestream, NewFeedbackMessage_FINISH_LOADING_START_SAVING_stores_known_bridges) {
+    ASSERT_EQ(huestream->GetKnownBridges()->size(), 0);
+
+    auto bridge = std::make_shared<Bridge>(std::make_shared<BridgeSettings>());
+    auto bridges = std::make_shared<BridgeList>();
+    bridges->push_back(bridge);
+    auto message = FeedbackMessage(FeedbackMessage::REQUEST_TYPE_LOAD_BRIDGE, FeedbackMessage::ID_FINISH_LOADING_BRIDGE_CONFIGURED, bridge, bridges);
+    _mockConnect->callback(message);
+    ASSERT_EQ(huestream->GetKnownBridges()->size(), 1);
+
+    bridges = std::make_shared<BridgeList>();
+    message = FeedbackMessage(FeedbackMessage::REQUEST_TYPE_RESET_ALL, FeedbackMessage::ID_START_SAVING, bridge, bridges);
+    _mockConnect->callback(message);
+    ASSERT_EQ(huestream->GetKnownBridges()->size(), 0);
+}
+
 TEST_F(TestHuestream, SetOn) {
     EXPECT_CALL(*_mockGroupController, SetOn(true));
     huestream->SetGroupOn(true);
@@ -533,7 +561,6 @@ TEST_F(TestHuestream, LightStateUpdatedHandler) {
     _mockStream->ExecuteRenderCallback();
     ASSERT_TRUE(_handler->_lights != nullptr);
 }
-
 
 /******************************************************************************/
 /*                                 END OF FILE                                */

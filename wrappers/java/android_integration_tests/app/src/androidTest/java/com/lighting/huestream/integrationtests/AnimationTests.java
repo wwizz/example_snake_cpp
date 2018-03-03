@@ -38,6 +38,7 @@ public class AnimationTests extends BaseTest {
 
     private static String RGB_BLACK = "#000000";
     private static int LIGHTS_COUNT = 4;
+    private static long TIMEOUT_MS = 1000;
 
     private IFeedbackMessageHandler _messageHandler = new FeedBackHandler();
 
@@ -70,7 +71,7 @@ public class AnimationTests extends BaseTest {
         _hue_stream.ConnectManualBridgeInfo(_bridge);
 
         threadWaitFor(100);
-        expectSameColor(RGB_BLACK, _frontLeftLight, _frontRightLight, _rearLeftLight, _rearRightLight);
+        expectBlack(_frontLeftLight, _frontRightLight, _rearLeftLight, _rearRightLight);
     }
 
     @After
@@ -135,26 +136,49 @@ public class AnimationTests extends BaseTest {
         _hue_stream.UnlockMixer();
     }
 
-    private void expectSameColor(final String expectedColor, Light... lights) {
-        Assert.assertNotEquals("Incoming lights collection is empty", 0, lights.length);
+    private enum ExpectedCondition {
+        Equal,
+        Different
+    }
 
-        for (Light light : lights) {
-            final String actualColor = _bridgeWrapperHelper.getLightRBGColor(light.asLightID());
+    private boolean conditionMet(final String expectedColor, final String actualColor, final ExpectedCondition condition) {
+        if (condition == ExpectedCondition.Equal) {
+            return actualColor.equals(expectedColor);
+        }
+        return !actualColor.equals(expectedColor);
+    }
 
-            _errorCollector.checkThat(String.format("Colors are not equal, expected=%s, actual %s", expectedColor, actualColor),
+    private void checkThat(final String expectedColor, final String actualColor, final ExpectedCondition condition, final long timeout) {
+        if (condition == ExpectedCondition.Equal) {
+            _errorCollector.checkThat(String.format("Colors are not equal, expected=%s, actual %s", expectedColor, actualColor, timeout),
                     actualColor, CoreMatchers.equalTo(expectedColor));
+        } else {
+            _errorCollector.checkThat(String.format("Colors are equal, not expected=%s, actual %s", expectedColor, actualColor, timeout),
+                    actualColor, CoreMatchers.not(expectedColor));
         }
     }
 
-    private void expectDifferentColor(final String expectedColor, Light... lights) {
+    private void expectColor(final String expectedColor, final ExpectedCondition expectedCondition, Light... lights) {
         Assert.assertNotEquals("Incoming lights collection is empty", 0, lights.length);
-
+        long startedAt = System.currentTimeMillis();
         for (Light light : lights) {
-            final String actualColor = _bridgeWrapperHelper.getLightRBGColor(light.asLightID());
-
-            _errorCollector.checkThat(String.format("Colors are equal, not expected=%s, actual %s", expectedColor, actualColor),
-                    actualColor, CoreMatchers.not(expectedColor));
+            String actualColor = _bridgeWrapperHelper.getLightRBGColor(light.asLightID());
+            long diffMs = System.currentTimeMillis() - startedAt;
+            while (!conditionMet(expectedColor, actualColor, expectedCondition) && diffMs < TIMEOUT_MS) {
+                threadWaitFor(10);
+                actualColor = _bridgeWrapperHelper.getLightRBGColor(light.asLightID());
+                diffMs = System.currentTimeMillis() - startedAt;
+            }
+            checkThat(expectedColor, actualColor, expectedCondition, diffMs);
         }
+    }
+
+    private void expectBlack(Light... lights) {
+        expectColor(RGB_BLACK, ExpectedCondition.Equal, lights);
+    }
+
+    private void expectNotBlack(Light... lights) {
+        expectColor(RGB_BLACK, ExpectedCondition.Different, lights);
     }
 
     @Test
@@ -168,7 +192,7 @@ public class AnimationTests extends BaseTest {
         effect.Enable();
 
         threadWaitFor(100);
-        expectDifferentColor(RGB_BLACK, _frontRightLight, _frontLeftLight, _rearLeftLight, _rearRightLight);
+        expectNotBlack(_frontRightLight, _frontLeftLight, _rearLeftLight, _rearRightLight);
     }
 
     @Test
@@ -189,8 +213,8 @@ public class AnimationTests extends BaseTest {
         frontRightPart.Enable();
 
         threadWaitFor(200);
-        expectDifferentColor(RGB_BLACK, _rearLeftLight, _frontRightLight);
-        expectSameColor(RGB_BLACK, _rearRightLight, _frontLeftLight);
+        expectNotBlack(_rearLeftLight, _frontRightLight);
+        expectBlack(_rearRightLight, _frontLeftLight);
     }
 
     @Test
@@ -207,7 +231,7 @@ public class AnimationTests extends BaseTest {
 
         threadWaitFor(100);
 
-        expectDifferentColor(RGB_BLACK, _frontLeftLight, _frontRightLight, _rearLeftLight, _rearRightLight);
+        expectNotBlack(_frontLeftLight, _frontRightLight, _rearLeftLight, _rearRightLight);
     }
 
     @Test
@@ -228,21 +252,21 @@ public class AnimationTests extends BaseTest {
         effect.Enable();
 
         threadWaitFor(100);
-        expectDifferentColor(RGB_BLACK, _rearRightLight);
-        expectSameColor(RGB_BLACK, _frontRightLight, _frontLeftLight, _rearLeftLight);
+        expectNotBlack(_rearRightLight);
+        expectBlack(_frontRightLight, _frontLeftLight, _rearLeftLight);
 
         threadWaitFor(OFFSET_DIRATION);
-        expectDifferentColor(RGB_BLACK, _rearLeftLight);
-        expectSameColor(RGB_BLACK, _rearRightLight, _frontRightLight, _frontLeftLight);
+        expectNotBlack(_rearLeftLight);
+        expectBlack(_rearRightLight, _frontRightLight, _frontLeftLight);
 
 
         threadWaitFor(OFFSET_DIRATION);
-        expectDifferentColor(RGB_BLACK, _frontLeftLight);
-        expectSameColor(RGB_BLACK, _frontRightLight, _rearRightLight, _rearLeftLight);
+        expectNotBlack(_frontLeftLight);
+        expectBlack(_frontRightLight, _rearRightLight, _rearLeftLight);
 
         threadWaitFor(OFFSET_DIRATION);
-        expectDifferentColor(RGB_BLACK, _frontRightLight);
-        expectSameColor(RGB_BLACK, _frontLeftLight, _rearLeftLight, _rearRightLight);
+        expectNotBlack(_frontRightLight);
+        expectBlack(_frontLeftLight, _rearLeftLight, _rearRightLight);
     }
 
     @Test
@@ -259,6 +283,6 @@ public class AnimationTests extends BaseTest {
 
         threadWaitFor(100);
 
-        expectDifferentColor(RGB_BLACK, _frontLeftLight, _frontRightLight, _rearLeftLight, _rearRightLight);
+        expectNotBlack(_frontLeftLight, _frontRightLight, _rearLeftLight, _rearRightLight);
     }
 }

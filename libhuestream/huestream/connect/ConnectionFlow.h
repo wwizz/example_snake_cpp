@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -84,9 +84,9 @@ class ConnectionFlow: public IConnectionFlow {
 
     bool Start(FeedbackMessage::RequestType request);
 
-    void StartLoading();
+    void StartLoading(std::function<void()> callback);
 
-    void LoadingCompleted(OperationResult result, HueStreamDataPtr persistentData);
+    void LoadingCompleted(OperationResult result, HueStreamDataPtr persistentData, std::function<void()> callback);
 
     void StartBridgeSearch();
 
@@ -104,9 +104,15 @@ class ConnectionFlow: public IConnectionFlow {
 
     void PushLinkBridge(BridgePtr bridge);
 
+    void StartRetrieveSmallConfig(BridgePtr bridge);
+
+    void RetrieveSmallConfigCompleted(OperationResult result, BridgePtr bridge);
+
     void StartRetrieveFullConfig();
 
     void RetrieveFullConfigCompleted(OperationResult result, BridgePtr bridge);
+
+    void RetrieveFailed(BridgePtr bridge);
 
     void ReportActionRequired();
 
@@ -114,7 +120,7 @@ class ConnectionFlow: public IConnectionFlow {
 
     void DeactivateStreaming();
 
-    void SetNewActiveBridge(BridgePtr bridge);
+    bool EvaluateBridgesSecurity(BridgeList bridges);
 
     void ClearBridge();
 
@@ -129,7 +135,8 @@ class ConnectionFlow: public IConnectionFlow {
     BridgeSettingsPtr _bridgeSettings;
     BridgeStorageAccessorPtr _storageAccessor;
     BridgeSearcherPtr _bridgeSearcher;
-    FullConfigRetrieverPtr _fullconfigRetriever;
+    ConfigRetrieverPtr _smallConfigRetriever;
+    ConfigRetrieverPtr _fullConfigRetriever;
     ConnectionFlowState _state;
     FeedbackMessage::RequestType _request;
     size_t _ongoingAuthenticationCount;
@@ -137,7 +144,7 @@ class ConnectionFlow: public IConnectionFlow {
     StreamPtr _stream;
     FeedbackMessageCallback _feedbackMessageCallback;
     HueStreamDataPtr _persistentData;
-
+    BridgePtr _bridgeStartState;
 };
 }  // namespace huestream
 

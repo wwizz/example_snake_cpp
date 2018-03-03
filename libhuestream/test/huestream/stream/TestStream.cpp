@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -41,7 +41,7 @@ class TestStream : public testing::Test {
         _streamSettings->SetStreamingColorSpace(COLORSPACE_RGB);
         _streamSettings->SetUpdateFrequency(200);
         _appSettings = std::make_shared<AppSettings>();
-        _appSettings->SetUseForcedActivation(true);
+        _appSettings->SetActivationOverride(ACTIVATION_OVERRIDELEVEL_SAMEGROUP);
 
         _mockConnector = std::make_shared<MockConnector>();
         _bridge = CreateBridge();
@@ -87,7 +87,7 @@ class TestStream : public testing::Test {
     }
 
     void start_correctly_without_renderthread() {
-        Expectation start = EXPECT_CALL(*_mockStreamStarterPtr, Start(true)).Times(1).WillOnce(
+        Expectation start = EXPECT_CALL(*_mockStreamStarterPtr, StartStream(ACTIVATION_OVERRIDELEVEL_SAMEGROUP)).Times(1).WillOnce(
             Invoke(&*_mockStreamStarterPtr, &MockStreamStarter::ActivateSuccess));
 
         Expectation connect = EXPECT_CALL(*_mockConnector,
@@ -122,7 +122,7 @@ class TestStream : public testing::Test {
 };
 
 TEST_F(TestStream, StartWithRenderThread) {
-    Expectation start = EXPECT_CALL(*_mockStreamStarterPtr, Start(true)).Times(1).WillOnce(
+    Expectation start = EXPECT_CALL(*_mockStreamStarterPtr, StartStream(ACTIVATION_OVERRIDELEVEL_SAMEGROUP)).Times(1).WillOnce(
         Invoke(&*_mockStreamStarterPtr, &MockStreamStarter::ActivateSuccess));
     Expectation connect = EXPECT_CALL(*_mockConnector,
                                       Connect(MatchBridgeIpAddress("SOMEIP"), 2100)).Times(1).After(
@@ -158,7 +158,7 @@ TEST_F(TestStream, StartWithoutRenderThread) {
 
 TEST_F(TestStream, FailClientConnectRetries) {
 
-    Expectation start = EXPECT_CALL(*_mockStreamStarterPtr, Start(true)).Times(1).WillOnce(
+    Expectation start = EXPECT_CALL(*_mockStreamStarterPtr, StartStream(ACTIVATION_OVERRIDELEVEL_SAMEGROUP)).Times(1).WillOnce(
         Invoke(&*_mockStreamStarterPtr, &MockStreamStarter::ActivateSuccess));
     Expectation connect = EXPECT_CALL(*_mockConnector, Connect(MatchBridgeIpAddress("SOMEIP"),
         2100)).Times(5).After(start).WillRepeatedly(Return(false));
@@ -176,7 +176,7 @@ TEST_F(TestStream, FailClientConnectRetries) {
 }
 
 TEST_F(TestStream, FailCantActivate) {
-    EXPECT_CALL(*_mockStreamStarterPtr, Start(true)).Times(1).WillOnce(Return(false));
+    EXPECT_CALL(*_mockStreamStarterPtr, StartStream(ACTIVATION_OVERRIDELEVEL_SAMEGROUP)).Times(1).WillOnce(Return(false));
     EXPECT_CALL(*_mockConnector, Connect(_, _)).Times(0);
     EXPECT_CALL(*_mockConnector, Send(_, _)).Times(0);
 
@@ -217,7 +217,7 @@ TEST_F(TestStream, StartWhenAlreadyRunningOnDifferentBridgeFirstStops) {
     Expectation disconnect = EXPECT_CALL(*_mockConnector, Disconnect()).Times(1);
     Expectation stop = EXPECT_CALL(*_mockStreamStarterPtr, Stop()).Times(1).WillOnce(
         Invoke(&*_mockStreamStarterPtr, &MockStreamStarter::DeactivateSuccess));
-    Expectation start = EXPECT_CALL(*_mockStreamStarterPtr, Start(true)).Times(1).After(disconnect, stop).WillOnce(
+    Expectation start = EXPECT_CALL(*_mockStreamStarterPtr, StartStream(ACTIVATION_OVERRIDELEVEL_SAMEGROUP)).Times(1).After(disconnect, stop).WillOnce(
         Invoke(&*_mockStreamStarterPtr, &MockStreamStarter::ActivateSuccess));
     Expectation connect = EXPECT_CALL(*_mockConnector,
                                       Connect(MatchBridgeIpAddress("SOMEOTHERIP"), 2100)).Times(1).After(
@@ -236,7 +236,7 @@ TEST_F(TestStream, StartWhenAlreadyRunningOnDifferentGroupFirstStops) {
 
     Expectation disconnect = EXPECT_CALL(*_mockConnector, Disconnect()).Times(1);
     Expectation stop = EXPECT_CALL(*_mockStreamStarterPtr, Stop()).Times(1);
-    Expectation start = EXPECT_CALL(*_mockStreamStarterPtr, Start(true)).Times(1).After(disconnect, stop).WillOnce(
+    Expectation start = EXPECT_CALL(*_mockStreamStarterPtr, StartStream(ACTIVATION_OVERRIDELEVEL_SAMEGROUP)).Times(1).After(disconnect, stop).WillOnce(
         Invoke(&*_mockStreamStarterPtr, &MockStreamStarter::ActivateSuccess));
     Expectation connect = EXPECT_CALL(*_mockConnector,
                                       Connect(MatchBridgeIpAddress("SOMEIP"), 2100)).Times(1).After(

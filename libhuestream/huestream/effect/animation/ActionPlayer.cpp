@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -36,17 +36,17 @@ namespace huestream {
         return false;
     }
 
-    void ActionPlayer::BindAnimation(AnimationPtr animation) const {
-        animation->Rewind();
-        if (!AnimationIsBound(animation)) {
-            _animationList->push_back(animation);
+    void ActionPlayer::RewindNewAnimations(AnimationListPtr animations) const {
+        for (auto &animation : *animations) {
+            if (!AnimationIsBound(animation)) {
+                animation->Rewind();
+            }
         }
     }
 
     void ActionPlayer::BindAnimations(AnimationListPtr animations) const {
-        for (auto &animation : *animations) {
-            BindAnimation(animation);
-        }
+        RewindNewAnimations(animations);
+        *_animationList = *animations;
     }
 
     void ActionPlayer::Start() {

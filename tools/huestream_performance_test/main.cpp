@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <thread>
 #include <iostream>
-#include <logging/Log.h>
+#include <support/logging/Log.h>
 #include <huestream/config/Config.h>
 #include <huestream/HueStream.h>
 #include <huestream/effect/effects/SequenceEffect.h>

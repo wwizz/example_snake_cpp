@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -94,8 +94,7 @@ void EffectPlayer::PlayExplosion() {
     explosion->Enable();
 
     m_hueStream->UnlockMixer();
-    PlaySoundA((LPCSTR) "explosion.wav",
-               NULL, SND_FILENAME | SND_ASYNC);
+    PlaySoundA((LPCSTR) "explosion.wav", NULL, SND_FILENAME | SND_ASYNC);
 }
 
 void EffectPlayer::PlayRedWhiteBlue() {
@@ -181,24 +180,21 @@ void EffectPlayer::PlayCombi() {
 
 void EffectPlayer::PlaySequenceRound() {
     Start();
-    AfxBeginThread(SequenceRound, (LPVOID)
-    this);
+    AfxBeginThread(SequenceRound, (LPVOID)this);
 }
 
 void EffectPlayer::PlaySequenceLtoR() {
     Start();
-    AfxBeginThread(SequenceLtoR, (LPVOID)
-    this);
+    AfxBeginThread(SequenceLtoR, (LPVOID)this);
 }
 
 void EffectPlayer::PlaySequenceFtoB() {
     Start();
-    AfxBeginThread(SequenceFtoB, (LPVOID)
-    this);
+    AfxBeginThread(SequenceFtoB, (LPVOID)this);
 }
 
 UINT EffectPlayer::SequenceRound(LPVOID pParam) {
-    EffectPlayer *self = static_cast<EffectPlayer *>(pParam);
+    auto *self = static_cast<EffectPlayer *>(pParam);
     auto hueStream = self->m_hueStream;
 
     static auto s_roundeffectCount = 0;
@@ -241,7 +237,7 @@ UINT EffectPlayer::SequenceRound(LPVOID pParam) {
 }
 
 UINT EffectPlayer::SequenceLtoR(LPVOID pParam) {
-    EffectPlayer *self = static_cast<EffectPlayer *>(pParam);
+    auto *self = static_cast<EffectPlayer *>(pParam);
     auto hueStream = self->m_hueStream;
 
     static auto s_leftRightSeqCount = 0;
@@ -261,7 +257,7 @@ UINT EffectPlayer::SequenceLtoR(LPVOID pParam) {
 
     hueStream->UnlockMixer();
 
-    for (int i = 0; i < 30; i++) {
+    for (auto i = 0; i < 30; i++) {
         hueStream->LockMixer();
         effect->Step();
         hueStream->UnlockMixer();
@@ -282,7 +278,7 @@ UINT EffectPlayer::SequenceLtoR(LPVOID pParam) {
 }
 
 UINT EffectPlayer::SequenceFtoB(LPVOID pParam) {
-    EffectPlayer *self = static_cast<EffectPlayer *>(pParam);
+    auto *self = static_cast<EffectPlayer *>(pParam);
     auto hueStream = self->m_hueStream;
 
     static auto s_frontbackSeqCount = 0;
@@ -300,7 +296,7 @@ UINT EffectPlayer::SequenceFtoB(LPVOID pParam) {
 
     hueStream->UnlockMixer();
 
-    for (int i = 0; i < 30; i++) {
+    for (auto i = 0; i < 30; i++) {
         hueStream->LockMixer();
         effect->Step();
         hueStream->UnlockMixer();
@@ -484,13 +480,11 @@ void EffectPlayer::Start() {
     m_cs.Lock();
     m_running = true;
     m_cs.Unlock();
-    m_hueStream->StartAsync();
 }
 
 void EffectPlayer::Stop() {
     m_running = false;
     m_cv.notify_all();
-    m_hueStream->StopAsync();
     m_marquee = nullptr;
 }
 

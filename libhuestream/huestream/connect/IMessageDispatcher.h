@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -27,6 +27,8 @@ namespace huestream {
 #define MESSAGE_DISPATCH_P2(dispatcher, method, value1, value2) \
   MESSAGE_DISPATCH(dispatcher, std::bind(&method, this, value1, value2));
 
+#define MESSAGE_DISPATCH_P3(dispatcher, method, value1, value2, value3) \
+  MESSAGE_DISPATCH(dispatcher, std::bind(&method, this, value1, value2, value3));
 
     class IMessageDispatcher {
     public:

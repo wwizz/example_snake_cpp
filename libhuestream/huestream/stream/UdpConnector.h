@@ -1,15 +1,16 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
 #ifndef HUESTREAM_STREAM_UDPCONNECTOR_H_
 #define HUESTREAM_STREAM_UDPCONNECTOR_H_
 
-#include <network/sockets/SocketUdp.h>
-#include <huestream/stream/IConnector.h>
-
 #include <memory>
+#include <string>
+
+#include "support/network/sockets/SocketUdp.h"
+#include "huestream/stream/IConnector.h"
 
 namespace huestream {
 
@@ -33,8 +34,8 @@ namespace huestream {
     private:
         std::string RemovePortFromIp(std::string ip) const;
 
-        std::shared_ptr<huesdk_lib::SocketUdp> _socketUdp;
-        huesdk_lib::SocketAddress _peerAddress;
+        std::shared_ptr<support::SocketUdp> _socketUdp;
+        support::SocketAddress _peerAddress;
         ConnectionState _connectionState;
     };
 }  // namespace huestream

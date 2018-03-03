@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -95,7 +95,7 @@ namespace huestream {
 
     bool Stream::StartStreamingSession(BridgePtr bridge) {
         // ready to start the stream session
-        auto startSuccessful = _factory->CreateStreamStarter(bridge)->Start(_appSettings->UseForcedActivation());
+        auto startSuccessful = _factory->CreateStreamStarter(bridge)->StartStream(_appSettings->GetActivationOverride());
         if (!startSuccessful) {
             return false;
         }

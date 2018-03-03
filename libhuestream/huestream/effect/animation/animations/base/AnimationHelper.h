@@ -1,5 +1,5 @@
 /*******************************************************************************
-Copyright (C) 2017 Philips Lighting Holding B.V.
+Copyright (C) 2018 Philips Lighting Holding B.V.
 All Rights Reserved.
 ********************************************************************************/
 /** @file */
@@ -18,6 +18,8 @@ namespace huestream {
     class AnimationHelper {
     public:
         static AnimationListPtr CreatePtr(AnimationPtr p1);
+
+        static AnimationListPtr CreatePtr(AnimationPtr p1, AnimationPtr p2);
 
         static AnimationListPtr CreatePtr(AnimationPtr p1, AnimationPtr p2, AnimationPtr p3, AnimationPtr p4);
 

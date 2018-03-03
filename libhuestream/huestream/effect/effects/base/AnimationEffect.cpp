@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -56,7 +56,6 @@ namespace huestream {
     }
 
     void AnimationEffect::SetPlayer(PlayerPtr player) {
-        _speedPlayer = player;
         _player = player;
     }
 

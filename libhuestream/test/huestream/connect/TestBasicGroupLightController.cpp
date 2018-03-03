@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -10,7 +10,7 @@
 
 #include "test/huestream/_mock/MockHttpRequest.h"
 #include "test/huestream/_mock/MockHttpClient.h"
-#include "network/http/HttpResponse.h"
+#include "support/network/http/HttpResponse.h"
 
 using ::testing::Invoke;
 using ::testing::Eq;
@@ -20,7 +20,7 @@ using ::testing::Return;
 
 namespace huestream {
 
-    typedef int(*http_exec_function)(huesdk_lib::HttpRequestCallback);
+    typedef int(*http_exec_function)(support::HttpRequestCallback);
 
     class TestBasicGroupLightController : public testing::Test {
     public:

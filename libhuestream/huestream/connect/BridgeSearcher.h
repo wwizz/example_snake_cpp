@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -25,7 +25,7 @@ namespace huestream {
             void Abort() override;
 
         protected:
-            virtual void operator()(const std::vector<huesdk::BridgeDiscoveryResult> &results,
+            virtual void operator()(const std::vector<std::shared_ptr<huesdk::BridgeDiscoveryResult>> &results,
                                     huesdk::BridgeDiscoveryReturnCode return_code) override;
 
             SearchCallbackHandler _cb;

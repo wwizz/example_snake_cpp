@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -16,9 +16,7 @@ namespace huestream {
 
     class IStreamFactory {
     public:
-        virtual ~IStreamFactory() {
-        }
-
+        virtual ~IStreamFactory() = default;
         virtual StreamStarterPtr CreateStreamStarter(BridgePtr bridge) = 0;
     };
 

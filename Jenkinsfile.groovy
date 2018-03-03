@@ -263,7 +263,7 @@ def test_stage(BuildTask task) {
 def build_jobs_for_parallel_execution = [:]
 
 stage('checkout') {
-    node('master') {
+    node('linux-prince') {
 
         println " --- Gathering build task"
         
@@ -351,16 +351,18 @@ stage('checkout') {
         println " --- Checking out source code"
         checkout scm
 
-        if (fileExists('modules/edk/export-edk.sh')) {
+        if (fileExists('tools/export-edk/export-edk.sh')) {
             // running on sdk -- export the edk first
-            sh './modules/edk/export-edk.sh exported_edk false'
+            sh './tools/export-edk/export-edk.sh exported_edk false'
 
             dir('exported_edk') {
                 stash name: 'source'
             }
-        } else {
+        } else if (fileExists('libhuestream/CMakeLists.txt')) {
             // running on standalone edk
             stash name: 'source'
+        } else {
+            fail("Could not find edk or sdk")
         }
     }
 }

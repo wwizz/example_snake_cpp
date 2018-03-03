@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -17,7 +17,7 @@ namespace huestream {
     public:
         IConnector() {}
 
-        virtual ~IConnector() {}
+        virtual ~IConnector() = default;
 
         virtual bool Connect(BridgePtr bridge, unsigned short port) = 0;
 

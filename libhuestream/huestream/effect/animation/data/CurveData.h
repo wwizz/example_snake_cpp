@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -36,6 +36,7 @@ namespace huestream {
         explicit CurveData(PointListPtr points, Nullable<CurveOptions> options = Nullable<CurveOptions>());
 
         PointPtr GetInterpolated(double x) const;
+        double GetStepValue(double x) const;
 
         double GetLength() const;
 

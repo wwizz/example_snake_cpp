@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 /** @file */
@@ -58,6 +58,11 @@ class HueStreamData : public Serializable {
      */
     bool RediscoverKnownBridge(BridgeListPtr discoveredBridges);
 
+    /**
+     @return list of all known bridges that are authenticated for streaming
+     */
+    BridgeListPtr GetAllKnownBridges();
+
     void Serialize(JSONNode *node) const override;
 
     void Deserialize(JSONNode *node) override;
@@ -69,7 +74,6 @@ class HueStreamData : public Serializable {
 
 protected:
     BridgeSettingsPtr _bridgeSettings;
-
 };
 
 /**

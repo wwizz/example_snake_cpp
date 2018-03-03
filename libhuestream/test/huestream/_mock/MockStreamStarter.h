@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -8,6 +8,9 @@
 
 #include "gtest/gtest.h"
 #include "gmock/gmock.h"
+
+#include <string>
+
 #include "huestream/stream/IStreamStarter.h"
 
 namespace huestream {
@@ -15,8 +18,10 @@ namespace huestream {
     public:
         BridgePtr bridge;
 
+        MOCK_METHOD1(StartStream, bool(ActivationOverrideLevel overrideLevel));
         MOCK_METHOD1(Start, bool(bool force));
         MOCK_METHOD0(Stop, void());
+        MOCK_METHOD1(DeactivateGroup, bool(std::string groupId));
 
         bool ActivateSuccess(bool force) {
             bridge->GetGroup()->SetActive(true);

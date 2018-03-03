@@ -56,6 +56,10 @@ set_source_files_properties(${swig_interface_file} PROPERTIES SWIG_FLAGS "-names
 
 # Should be swig_add_library, but cmake of jenkins/AS is too old.
 swig_add_module(${swig_target} csharp ${swig_interface_file})
+#swig_add_library(${swig_target}
+#                 LANGUAGE csharp
+#                 SOURCES ${swig_interface_file}
+#                 )
 swig_link_libraries(${swig_target} ${swig_module_dependencies})
 
 #now the real target name is clear

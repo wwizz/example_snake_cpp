@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -17,12 +17,15 @@ namespace huestream {
         StreamStarter(BridgePtr bridge, HttpClientPtr _http);
         ~StreamStarter();
 
+        bool StartStream(ActivationOverrideLevel overrideLevel) override;
         bool Start(bool force) override;
         void Stop() override;
+        bool DeactivateGroup(std::string groupId) override;
 
 
     protected:
         bool Execute(bool activate);
+        bool Execute(std::string url, bool activate);
 
         bool CheckForErrors(HttpRequestPtr req);
 

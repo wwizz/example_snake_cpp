@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -78,6 +78,17 @@ namespace huestream {
                                         const std::string &attribute_name,
                                         int *value,
                                         int default_value) {
+        if (SerializerHelper::IsAttributeSet(node, attribute_name)) {
+            *value = static_cast<int>((*node)[attribute_name].as_int());
+        } else {
+            *value = default_value;
+        }
+    }
+
+    void Serializable::DeserializeValue(const JSONNode *node,
+                                        const std::string &attribute_name,
+                                        int64_t *value,
+                                        int64_t  default_value) {
         if (SerializerHelper::IsAttributeSet(node, attribute_name)) {
             *value = static_cast<int>((*node)[attribute_name].as_int());
         } else {

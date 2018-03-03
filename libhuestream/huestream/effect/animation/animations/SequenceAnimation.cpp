@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -21,7 +21,13 @@ namespace huestream {
               currentIndex_(-1) {}
 
     AnimationPtr SequenceAnimation::Clone() {
-        return std::make_shared<SequenceAnimation>(*this);
+        auto deepCopy = std::make_shared<SequenceAnimation>(*this);
+        auto sequencesCopy = std::make_shared<AnimationList>();
+        for (auto item : *_sequences) {
+            sequencesCopy->push_back(item->Clone());
+        };
+        deepCopy->SetSequences(sequencesCopy);
+        return deepCopy;
     }
 
     void SequenceAnimation::UpdateValue(double *value, double positionMs) {

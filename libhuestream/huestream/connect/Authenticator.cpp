@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -23,7 +23,7 @@ namespace huestream {
             // Only request client key if either Api Version is valid or Api Version is unknown
             // If the Api Version is unknown and turns out not to support client key generation then we'll set the Api Version to invalid at error reception
             bool requestClientKey = (bridge->IsValidApiVersion() || bridge->GetApiversion().empty());
-            auto deviceType = appSettings->GetName() + "#" + appSettings->GetPlatform();
+            auto deviceType = CreateDeviceType(appSettings);
             if (requestClientKey) {
                 data = "{\"devicetype\": \"" + deviceType + "\", \"generateclientkey\": true\n}";
             } else {
@@ -31,6 +31,7 @@ namespace huestream {
             }
 
             auto req = std::make_shared<HttpRequestInfo>(HTTP_REQUEST_POST, url, data);
+            req->SetEnableSslVerification(false);
             _http->Execute(req);
 
             if (!req->GetSuccess()) {
@@ -55,6 +56,14 @@ namespace huestream {
         void Authenticator::Abort() {}
 
         Authenticator::Authenticator(HttpClientPtr http) : _http(http) {
+        }
+
+        std::string Authenticator::CreateDeviceType(AppSettingsPtr appSettings) {
+            auto appName = appSettings->GetAppName();
+            auto deviceName = appSettings->GetDeviceName();
+            appName.erase(std::remove(appName.begin(), appName.end(), '#'), appName.end());
+            deviceName.erase(std::remove(deviceName.begin(), deviceName.end(), '#'), deviceName.end());
+            return appName.substr(0, 20) + "#" + deviceName.substr(0, 19);
         }
 
         void Authenticator::ParseCredentials(JSONNode root, BridgePtr bridge) {

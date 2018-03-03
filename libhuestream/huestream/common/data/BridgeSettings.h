@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -20,6 +20,10 @@ namespace huestream {
     PROP_DEFINE(BridgeSettings, int, supportedApiVersionMinor, SupportedApiVersionMinor);
     PROP_DEFINE(BridgeSettings, int, supportedApiVersionBuild, SupportedApiVersionBuild);
     PROP_DEFINE(BridgeSettings, int, supportedModel, SupportedModel);
+
+    PROP_DEFINE(BridgeSettings, int, supportedHttpsApiVersionMajor, SupportedHttpsApiVersionMajor);
+    PROP_DEFINE(BridgeSettings, int, supportedHttpsApiVersionMinor, SupportedHttpsApiVersionMinor);
+    PROP_DEFINE(BridgeSettings, int, supportedHttpsApiVersionBuild, SupportedHttpsApiVersionBuild);
     };
 
     typedef std::shared_ptr<BridgeSettings> BridgeSettingsPtr;

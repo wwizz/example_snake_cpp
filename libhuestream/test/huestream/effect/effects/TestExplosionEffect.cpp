@@ -23,7 +23,7 @@ namespace huestream {
 
         virtual void SetUp() {
             _mockTimeManager = std::make_shared<MockTimeManager>();
-            TimeProviderProvider::SetProviderMethod([this]() -> huestream::TimeProviderPtr {return _mockTimeManager; });
+            TimeProviderProvider::set(_mockTimeManager);
             IncreaseTime(0);
             _engine = std::make_shared<Mixer>();
             _lightInRadius = std::make_shared<Light>("1", Location(0.0, 0.0));

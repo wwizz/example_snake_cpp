@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -56,16 +56,22 @@ LightIteratorEffect::LightIteratorEffect(std::string name,
     _mode(mode),
     _offset(offset),
     _preamble(preamble),
-    _invertOrder(invertOrder) {
-    _lightIdAnimationMap = std::make_shared<std::map<std::string, AnimationListPtr>>();
+    _invertOrder(invertOrder),
+    _lightIdAnimationMap(std::make_shared<std::map<std::string, AnimationListPtr>>()),
+    _group(std::make_shared<Group>()) {
 }
 
 LightIteratorEffect::~LightIteratorEffect() {
 }
 
 void LightIteratorEffect::UpdateGroup(GroupPtr group) {
-    CreateAnimations(group);
+    _group = group;
     InitializeAnimations();
+}
+
+void LightIteratorEffect::InitializeAnimations() {
+    CreateAnimations(_group);
+    ColorAnimationEffect::InitializeAnimations();
 }
 
 Color LightIteratorEffect::GetColor(LightPtr light) {

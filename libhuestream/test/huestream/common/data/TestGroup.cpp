@@ -193,6 +193,37 @@ TEST_F(TestGroup, Clone) {
     ASSERT_EQ(false, g->GetLights()->at(7)->Reachable());
 }
 
+TEST_F(TestGroup, OwnerName) {
+    pGroup->SetOwnerName("testappname#testdevicename");
+    ASSERT_EQ(pGroup->GetOwnerName(), "testappname#testdevicename");
+    EXPECT_EQ(pGroup->GetFriendlyOwnerName(), "testappname (testdevicename)");
+    EXPECT_EQ(pGroup->GetOwnerApplicationName(), "testappname");
+    EXPECT_EQ(pGroup->GetOwnerDeviceName(), "testdevicename");
+
+    pGroup->SetOwnerName("test12.,-char#dev&%@s");
+    EXPECT_EQ(pGroup->GetOwnerName(), "test12.,-char#dev&%@s");
+    EXPECT_EQ(pGroup->GetFriendlyOwnerName(), "test12.,-char (dev&%@s)");
+    EXPECT_EQ(pGroup->GetOwnerApplicationName(), "test12.,-char");
+    EXPECT_EQ(pGroup->GetOwnerDeviceName(), "dev&%@s");
+
+    pGroup->SetOwnerName("test only app");
+    EXPECT_EQ(pGroup->GetOwnerName(), "test only app");
+    EXPECT_EQ(pGroup->GetFriendlyOwnerName(), "test only app");
+    EXPECT_EQ(pGroup->GetOwnerApplicationName(), "test only app");
+    EXPECT_EQ(pGroup->GetOwnerDeviceName(), "");
+
+    pGroup->SetOwnerName("testStrange#");
+    EXPECT_EQ(pGroup->GetOwnerName(), "testStrange#");
+    EXPECT_EQ(pGroup->GetFriendlyOwnerName(), "testStrange");
+    EXPECT_EQ(pGroup->GetOwnerApplicationName(), "testStrange");
+    EXPECT_EQ(pGroup->GetOwnerDeviceName(), "");
+
+    pGroup->SetOwnerName("test#wrong#format");
+    EXPECT_EQ(pGroup->GetOwnerName(), "test#wrong#format");
+    EXPECT_EQ(pGroup->GetFriendlyOwnerName(), "test#wrong#format");
+    EXPECT_EQ(pGroup->GetOwnerApplicationName(), "test#wrong#format");
+    EXPECT_EQ(pGroup->GetOwnerDeviceName(), "");
+}
 
 /******************************************************************************/
 /*                                 END OF FILE                                */

@@ -7,7 +7,7 @@
 #include "test/huestream/_mock/MockBridgeSearcher.h"
 #include "TestableConnectionFlow.h"
 #include "test/huestream/_mock/MockConnectionFlowFactory.h"
-#include "test/huestream/_mock/MockBridgeStorageAccesser.h"
+#include "test/huestream/_mock/MockBridgeStorageAccessor.h"
 #include "test/huestream/_stub/StubMessageDispatcher.h"
 #include "TestConnectionFlowBase.h"
 #include "huestream/config/Config.h"
@@ -98,19 +98,19 @@ public:
 
     void connect_to_bridge_successfully(int index, int numGroups = 1) {
         connect_with_no_bridge_configured_starts_new_bridge_search();
-        searching_with_one_bridge_found_starts_pushlink();
+        searching_with_one_bridge_found_starts_pushlink(0);
         finish_authorization_successfully_and_retrieve_full_config(index, numGroups);
-        if (numGroups == 1) {
+        _persistentData->SetActiveBridge(_bridges->at(index));
+        if (numGroups == 0) {
+            finish_without_stream_start(false, true, false);
+        } else if (numGroups == 1) {
             finish(_bridges->at(index));
         } else {
             finish_without_stream_start(false);
         }
     }
 
-    void setup_for_stream_activation() {
-        _settings->SetAutoStartAtConnection(false);
-        connect_to_bridge_successfully(0, 1);
-
+    void start_stream_activation() {
         expect_message(FeedbackMessage::ID_USERPROCEDURE_STARTED, FeedbackMessage::FEEDBACK_TYPE_INFO);
         expect_initiate_full_config_retrieval();
         _connectionFlow->StartStream(nullptr);
@@ -122,15 +122,20 @@ public:
         _messageDispatcher->ExecutePendingActions();
     }
 
-    void connect_new_bridge_starts_searching(int previousBridgeIndex, bool wasPreviousBridgeConnected = true, bool wasPreviouslyStreaming = false) {
+    void setup_for_stream_activation() {
+        _settings->SetAutoStartAtConnection(false);
+        connect_to_bridge_successfully(0, 1);
+
+        start_stream_activation();
+    }
+
+    void connect_new_bridge_starts_searching(int previousBridgeIndex, bool wasPreviouslyStreaming = false) {
         expect_message(FeedbackMessage::ID_USERPROCEDURE_STARTED, FeedbackMessage::FEEDBACK_TYPE_INFO);
 
+        expect_storage_accessor_load_return_data();
+
         if (wasPreviouslyStreaming) {
-            expect_message(FeedbackMessage::ID_STREAMING_DISCONNECTED, FeedbackMessage::FEEDBACK_TYPE_USER, _bridges->at(previousBridgeIndex), BRIDGE_READY);
             EXPECT_CALL(*_stream, Stop(_bridges->at(previousBridgeIndex))).WillOnce(Invoke(DeactivateBridge));
-        }
-        if (wasPreviousBridgeConnected) {
-            expect_message(FeedbackMessage::ID_BRIDGE_DISCONNECTED, FeedbackMessage::FEEDBACK_TYPE_INFO);
         }
         expect_message(FeedbackMessage::ID_START_SEARCHING, FeedbackMessage::FEEDBACK_TYPE_INFO);
         expect_on_searcher_search_new(false);
@@ -187,7 +192,7 @@ TEST_F(TestConnectionFlow_NewBridge, search_twice_finish_with_no_bridges_found) 
 
 TEST_F(TestConnectionFlow_NewBridge, authentication_repeats_until_autenticated) {
     connect_with_no_bridge_configured_starts_new_bridge_search();
-    searching_with_one_bridge_found_starts_pushlink();
+    searching_with_one_bridge_found_starts_pushlink(0);
 
     finish_authorization_unsuccessfully_start_new_authentication(0);
     finish_authorization_unsuccessfully_start_new_authentication(0);
@@ -197,7 +202,7 @@ TEST_F(TestConnectionFlow_NewBridge, authentication_repeats_until_autenticated) 
 
 TEST_F(TestConnectionFlow_NewBridge, authentication_repeats_until_abort) {
     connect_with_no_bridge_configured_starts_new_bridge_search();
-    searching_with_one_bridge_found_starts_pushlink();
+    searching_with_one_bridge_found_starts_pushlink(0);
     finish_authorization_unsuccessfully_start_new_authentication(0);
     abort_finalizes();
 }
@@ -213,7 +218,7 @@ TEST_F(TestConnectionFlow_NewBridge, authentication_repeats_until_abort_multiple
 
 TEST_F(TestConnectionFlow_NewBridge, authentication_connection_failure_triggers_new_search) {
     connect_with_no_bridge_configured_starts_new_bridge_search();
-    searching_with_one_bridge_found_starts_pushlink();
+    searching_with_one_bridge_found_starts_pushlink(0);
     finish_authorization_with_connection_failure_ignores_bridge_and_starts_new_search(0);
 }
 
@@ -254,7 +259,7 @@ TEST_F(TestConnectionFlow_NewBridge, connect_twice_while_searching_is_ignored_bu
 
 TEST_F(TestConnectionFlow_NewBridge, connect_twice_while_autenticating_is_ignored) {
     connect_with_no_bridge_configured_starts_new_bridge_search();
-    searching_with_one_bridge_found_starts_pushlink();
+    searching_with_one_bridge_found_starts_pushlink(0);
     expect_no_actions();
     _connectionFlow->ConnectToBridge();
     _messageDispatcher->ExecutePendingActions();
@@ -264,14 +269,47 @@ TEST_F(TestConnectionFlow_NewBridge, select_existing_group_saves_bridge) {
     connect_to_bridge_successfully(0, 2);
 
     select_group_existing(0, "12");
-    finish(_bridges->at(0));
+    finish_with_stream_start(_bridges->at(0), false, true, true, false);
 }
 
 TEST_F(TestConnectionFlow_NewBridge, select_not_existing_group_saves_bridge) {
     connect_to_bridge_successfully(0);
 
-    select_group_not_existing(0, "1");
-    finish_without_stream_start(false);
+    expect_message(FeedbackMessage::ID_USERPROCEDURE_STARTED, FeedbackMessage::FEEDBACK_TYPE_INFO);
+    expect_message(FeedbackMessage::ID_USERPROCEDURE_FINISHED, FeedbackMessage::FEEDBACK_TYPE_INFO);
+    _connectionFlow->SelectGroup("1");
+    _messageDispatcher->ExecutePendingActions();
+}
+
+TEST_F(TestConnectionFlow_NewBridge, change_group_while_streaming) {
+    connect_to_bridge_successfully(0, 2);
+    ASSERT_FALSE(_bridges->at(0)->IsStreaming());
+
+    select_group_existing(0, "12");
+    finish_with_stream_start(_bridges->at(0), false, true, true, false);
+    ASSERT_TRUE(_bridges->at(0)->IsStreaming());
+
+    select_group_existing(0, "13");
+    finish_with_stream_start(_bridges->at(0), false, true, false, false);
+    ASSERT_TRUE(_bridges->at(0)->IsStreaming());
+}
+
+TEST_F(TestConnectionFlow_NewBridge, change_group_while_streaming_no_autostart) {
+    _settings->SetAutoStartAtConnection(false);
+    connect_to_bridge_successfully(0, 2);
+    ASSERT_FALSE(_bridges->at(0)->IsStreaming());
+
+    select_group_existing(0, "12");
+    finish_without_stream_start(true, false, false, false);
+    ASSERT_FALSE(_bridges->at(0)->IsStreaming());
+    
+    start_stream_activation();
+    finish_with_stream_start(_bridges->at(0), false, true, true, false);
+    ASSERT_TRUE(_bridges->at(0)->IsStreaming());
+
+    select_group_existing(0, "13");
+    finish_with_stream_start(_bridges->at(0), false, true, false, false);
+    ASSERT_TRUE(_bridges->at(0)->IsStreaming());
 }
 
 INSTANTIATE_TEST_CASE_P(start_successful, TestConnectionFlow_NewBridge, Values(0, 1));
@@ -281,7 +319,7 @@ TEST_P(TestConnectionFlow_NewBridge, start_successful) {
     
     setup_for_stream_activation();
 
-    finish_with_stream_start(_bridges->at(0));
+    finish_with_stream_start(_bridges->at(0), false, true, true, false);
 }
 
 TEST_F(TestConnectionFlow_NewBridge, start_fail) {
@@ -315,6 +353,7 @@ TEST_F(TestConnectionFlow_NewBridge, stop) {
 
     expect_message(FeedbackMessage::ID_USERPROCEDURE_STARTED, FeedbackMessage::FEEDBACK_TYPE_INFO);
     expect_message(FeedbackMessage::ID_STREAMING_DISCONNECTED, FeedbackMessage::FEEDBACK_TYPE_USER, _bridges->at(0), BRIDGE_READY);
+    expect_message(FeedbackMessage::ID_GROUPLIST_UPDATED, FeedbackMessage::FEEDBACK_TYPE_INFO);
     expect_message(FeedbackMessage::ID_USERPROCEDURE_FINISHED, FeedbackMessage::FEEDBACK_TYPE_INFO);
 
     EXPECT_CALL(*_stream, Stop(_bridges->at(0))).WillOnce(Invoke(DeactivateBridge));
@@ -336,6 +375,7 @@ TEST_F(TestConnectionFlow_NewBridge, connect_background_v1_bridge_ignored) {
 TEST_F(TestConnectionFlow_NewBridge, OnMonitorEventDisconnect) {
     connect_to_bridge_successfully(0, 1);
 
+    _bridges->at(0)->GetGroup()->SetActive(false);
     expect_message(FeedbackMessage::ID_STREAMING_DISCONNECTED, FeedbackMessage::FEEDBACK_TYPE_USER, _bridges->at(0), BRIDGE_READY);
 
     EXPECT_CALL(*_stream, Stop(_bridges->at(0))).WillOnce(Invoke(DeactivateBridge));
@@ -355,13 +395,13 @@ TEST_F(TestConnectionFlow_NewBridge, OnMonitorEventLightsChanged) {
 
 TEST_F(TestConnectionFlow_NewBridge, connect_to_new_bridge) {
     _settings->SetAutoStartAtConnection(false);
-    connect_to_bridge_successfully(0, 1);
+    connect_to_bridge_successfully(0, 2);
 
     connect_new_bridge_starts_searching(0);
 
     searching_with_three_bridges_found_starts_pushlink_on_all_three_bridges();
     finish_authorization_successfully_and_retrieve_full_config(1, 1, 2);
-    finish(_bridges->at(1));
+    finish_without_stream_start(true, false);
 }
 
 TEST_F(TestConnectionFlow_NewBridge, connect_to_new_bridge_stops_streaming_bridge) {
@@ -369,9 +409,31 @@ TEST_F(TestConnectionFlow_NewBridge, connect_to_new_bridge_stops_streaming_bridg
     connect_to_bridge_successfully(0, 1);
     ASSERT_EQ(_bridges->at(0)->GetStatus(), BRIDGE_STREAMING);
 
-    connect_new_bridge_starts_searching(0, true, true);
+    connect_new_bridge_starts_searching(0, true);
 
     searching_with_three_bridges_found_starts_pushlink_on_all_three_bridges();
-    finish_authorization_successfully_and_retrieve_full_config(1, 1, 2);
-    finish(_bridges->at(1));
+    finish_authorization_successfully_and_retrieve_full_config(1, 2, 2);
+    expect_message(FeedbackMessage::ID_STREAMING_DISCONNECTED, FeedbackMessage::FEEDBACK_TYPE_USER);
+    finish_without_stream_start(false, false);
+}
+
+TEST_P(TestConnectionFlow_NewBridge, connect_stores_bridgelist) {
+    connect_to_bridge_successfully(0);
+}
+
+INSTANTIATE_TEST_CASE_P(new_bridge_https, TestConnectionFlow_NewBridge, Values(true, false));
+
+TEST_P(TestConnectionFlow_NewBridge, new_bridge_https) {
+    EXPECT_FALSE(_bridges->at(4)->GetIsUsingSsl());
+
+    connect_with_no_bridge_configured_starts_new_bridge_search(GetParam());
+
+    if (GetParam()) {
+        searching_background_with_one_bridge_found_finishes(4);
+    }
+    else {
+        searching_with_one_bridge_found_starts_pushlink(4);
+    }
+
+    EXPECT_TRUE(_bridges->at(4)->GetIsUsingSsl());
 }

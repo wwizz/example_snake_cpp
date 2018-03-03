@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 /** @file */
@@ -60,6 +60,8 @@ namespace huestream {
 
         AnimationListPtr GetAnimations() override;
 
+        void InitializeAnimations() override;
+
         std::string GetTypeName() const override;
 
         Color GetColor(LightPtr light) override;
@@ -108,6 +110,7 @@ namespace huestream {
         static const std::map<IterationOrder, std::string> _orderSerializeMap;
         static const std::map<IterationMode, std::string> _modeSerializeMap;
         std::shared_ptr<std::map<std::string, AnimationListPtr>> _lightIdAnimationMap;
+        GroupPtr _group;
     };
 }  // namespace huestream
 

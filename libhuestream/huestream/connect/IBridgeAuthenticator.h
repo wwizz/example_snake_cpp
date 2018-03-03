@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -13,18 +13,18 @@
 
 namespace huestream {
 
-        typedef std::function<void(BridgePtr)> AutenticateCallbackHandler;
+        using AutenticateCallbackHandler = std::function<void(BridgePtr)>;
 
         class IBridgeAuthenticator {
         public:
-            virtual ~IBridgeAuthenticator() {}
+            virtual ~IBridgeAuthenticator() = default;
 
             virtual void Authenticate(BridgePtr bridge, AppSettingsPtr appSetting, AutenticateCallbackHandler cb) = 0;
 
         protected:
         };
 
-        typedef std::shared_ptr<IBridgeAuthenticator> BridgeAuthenticatorPtr;
+        using BridgeAuthenticatorPtr = std::shared_ptr<IBridgeAuthenticator>;
 
 }  // namespace huestream
 

@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -12,7 +12,7 @@
 #include <memory>
 #include <mutex>
 
-#include "threading/Thread.h"
+#include "support/threading/Thread.h"
 #include "IMessageDispatcher.h"
 
 namespace huestream {
@@ -34,7 +34,7 @@ namespace huestream {
         std::mutex _mutex;
         std::condition_variable _condition;
         bool _isRunning;
-        std::unique_ptr<huesdk_lib::Thread> _thread;
+        std::unique_ptr<support::Thread> _thread;
         void WaitUntilStarted();
     };
 

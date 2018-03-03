@@ -18,15 +18,19 @@ namespace huestream {
     protected:
         GroupPtr _group;
         std::shared_ptr<StubTimeProvider> _tp;
-        std::unique_ptr<TimeProviderProvider::Scope> _tpScope;
+        using ScopedtimeProviderProvider = support::ScopedProvider<TimeProviderPtr>;
+        ScopedtimeProviderProvider _tpScope;
         std::shared_ptr<Player> _player;
+
+        TestLightIteratorEffect()
+                : _group(std::make_shared<Group>()),
+                  _tp(std::make_shared<StubTimeProvider>()),
+                  _tpScope(_tp),
+                  _player(std::make_shared<Player>())
+        {}
 
         virtual void SetUp() {
             Serializable::SetObjectBuilder(std::make_shared<ObjectBuilder>(nullptr));
-            _group = std::make_shared<Group>();
-            _tp = make_shared<StubTimeProvider>();
-            _tpScope = TimeProviderProvider::SetProviderMethodInThisScope([this]() -> TimeProviderPtr {return _tp;});
-            _player = make_shared<Player>();
         }
 
         virtual void TearDown() {

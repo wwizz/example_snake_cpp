@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -125,9 +125,10 @@ namespace huestream {
         }
 
         void BasicGroupLightController::httpPut(const std::string & url, const JSONNode & actionNode) {
-            auto request = _http->CreateHttpRequest(url);
+            _request = _http->CreateHttpRequest(url);
+            _request->set_verify_ssl(false);
             auto body = actionNode.write();
-            request->do_put(body, [&](const huesdk_lib::HttpRequestError &error, const huesdk_lib::IHttpResponse &response) {});
+            _request->do_put(body, [&](const support::HttpRequestError &error, const support::IHttpResponse &response) {});
         }
 
 }  // namespace huestream

@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -30,7 +30,7 @@ class ConnectionFlowFactory : public IConnectionFlowFactory {
 
     BridgeStorageAccessorPtr GetStorageAccesser() override;
 
-    FullConfigRetrieverPtr CreateFullConfigRetriever(bool useForcedActivation = true) override;
+    ConfigRetrieverPtr CreateConfigRetriever(bool useForcedActivation = true, ConfigType configType = ConfigType::Full) override;
 
  private:
     BridgeSettingsPtr _bridgeSettings;

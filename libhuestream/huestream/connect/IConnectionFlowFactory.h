@@ -1,5 +1,5 @@
 /*******************************************************************************
- Copyright (C) 2017 Philips Lighting Holding B.V.
+ Copyright (C) 2018 Philips Lighting Holding B.V.
  All Rights Reserved.
  ********************************************************************************/
 
@@ -19,8 +19,7 @@ namespace huestream {
 
         class IConnectionFlowFactory {
         public:
-            virtual ~IConnectionFlowFactory() {
-            }
+            virtual ~IConnectionFlowFactory() = default;
 
             virtual BridgeSearcherPtr CreateSearcher() = 0;
 
@@ -30,7 +29,7 @@ namespace huestream {
 
             virtual BridgeStorageAccessorPtr GetStorageAccesser() = 0;
 
-            virtual FullConfigRetrieverPtr CreateFullConfigRetriever(bool useForcedActivation = true) = 0;
+            virtual ConfigRetrieverPtr CreateConfigRetriever(bool useForcedActivation = true, ConfigType configType = ConfigType::Full) = 0;
         };
 
         typedef std::shared_ptr<IConnectionFlowFactory> ConnectionFlowFactoryPtr;
