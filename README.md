@@ -364,6 +364,9 @@ The following external libraries are used in certain build variants:
   * Package is part of this repository and can be found in `3rd_party/boost`
 
 ### Changelog
+1.24.3
+- Temporary disabled https support
+
 1.24.2
 - Fixed certificate pinning for meethue
 - Introduced https

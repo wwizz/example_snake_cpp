@@ -420,20 +420,3 @@ TEST_F(TestConnectionFlow_NewBridge, connect_to_new_bridge_stops_streaming_bridg
 TEST_P(TestConnectionFlow_NewBridge, connect_stores_bridgelist) {
     connect_to_bridge_successfully(0);
 }
-
-INSTANTIATE_TEST_CASE_P(new_bridge_https, TestConnectionFlow_NewBridge, Values(true, false));
-
-TEST_P(TestConnectionFlow_NewBridge, new_bridge_https) {
-    EXPECT_FALSE(_bridges->at(4)->GetIsUsingSsl());
-
-    connect_with_no_bridge_configured_starts_new_bridge_search(GetParam());
-
-    if (GetParam()) {
-        searching_background_with_one_bridge_found_finishes(4);
-    }
-    else {
-        searching_with_one_bridge_found_starts_pushlink(4);
-    }
-
-    EXPECT_TRUE(_bridges->at(4)->GetIsUsingSsl());
-}

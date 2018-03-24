@@ -178,12 +178,7 @@ bool Bridge::IsValidClientKey() const {
 }
 
 bool Bridge::IsSupportingHttps() const {
-    ApiVersion thisVersion(_apiversion);
-    ApiVersion minVersion(_bridgeSettings->GetSupportedHttpsApiVersionMajor(),
-        _bridgeSettings->GetSupportedHttpsApiVersionMinor(),
-        _bridgeSettings->GetSupportedHttpsApiVersionBuild());
-
-    return thisVersion.IsValid() && thisVersion >= minVersion && (_modelId.empty() || IsValidModelId());
+    return false;
 }
 
 bool Bridge::IsGroupSelected() const {
@@ -387,7 +382,6 @@ void Bridge::SerializeBase(JSONNode *node) const {
     SerializeValue(node, AttributeUser, _user);
     SerializeValue(node, AttributeSelectedGroup, _selectedGroup);
     SerializeValue(node, AttributeMaxNoStreamingSessions, _maxNoStreamingSessions);
-    SerializeValue(node, AttributeIsUsingSsl, _isUsingSsl);
 }
 
 void Bridge::DeserializeBase(JSONNode *node) {
@@ -406,17 +400,12 @@ void Bridge::DeserializeBase(JSONNode *node) {
     DeserializeValue(node, AttributeUser, &_user, "");
     DeserializeValue(node, AttributeSelectedGroup, &_selectedGroup, "");
     DeserializeValue(node, AttributeMaxNoStreamingSessions, &_maxNoStreamingSessions, 0);
-    DeserializeValue(node, AttributeIsUsingSsl, &_isUsingSsl, false);
 }
 
 BridgePtr Bridge::Clone() const {
     auto bridgeCopy = std::make_shared<Bridge>(*this);
     bridgeCopy->SetGroups(clone_list(_groups));
     return bridgeCopy;
-}
-
-void Bridge::EnableSsl() {
-    _isUsingSsl = true;
 }
 
 }  // namespace huestream

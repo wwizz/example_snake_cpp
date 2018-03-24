@@ -34,7 +34,6 @@ public class BaseTest {
         result.SetClientKey(_clientKey);
         result.SetTcpPort(_tcp_port);
         result.SetSslPort(_ssl_port);
-        result.EnableSsl();
 
         return result;
     }

@@ -50,8 +50,7 @@ namespace huestream_tests
             result.SetClientKey(GetClientKey());
             result.SetTcpPort(TCP_PORT.ToString());
             result.SetSslPort(SSL_PORT);
-            result.EnableSsl();
-            
+
             return result;
         }
 

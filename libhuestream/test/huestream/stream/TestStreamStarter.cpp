@@ -53,9 +53,6 @@ namespace huestream {
             bridge->SetIsAuthorized(true);
             bridge->SetId("SOMEID");
             bridge->SetModelId("BSB002");
-            if (GetParam()) {
-                bridge->EnableSsl();
-            }
 
             bridge->SetClientKey("DD129216F1A50E5D1C0CB356325745F2");
             bridge->SetIsBusy(false);
@@ -63,7 +60,7 @@ namespace huestream {
         }
 
         std::string GetProtocol() {
-            return GetParam() ? "https" : "http";
+            return "http";
         }
     };
 

@@ -226,11 +226,6 @@ class Bridge : public Serializable {
     std::shared_ptr<Bridge> Clone() const;
 
     /**
-     enable HTTPS on the bridge
-     */
-    void EnableSsl();
-
-    /**
      check if bridge version supports HTTPS
      */
     bool IsSupportingHttps() const;

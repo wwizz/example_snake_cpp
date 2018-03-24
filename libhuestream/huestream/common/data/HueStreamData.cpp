@@ -68,9 +68,6 @@ bool HueStreamData::RediscoverKnownBridge(BridgeListPtr discoveredBridges) {
                 if (discoveredBridge->GetId() == knownBridge->GetId()) {
                     knownBridge->SetIpAddress(discoveredBridge->GetIpAddress());
                     knownBridge->SetIsValidIp(true);
-                    if (discoveredBridge->GetIsUsingSsl()) {
-                        knownBridge->EnableSsl();
-                    }
                     SetActiveBridge(knownBridge);
                     return true;
                 }

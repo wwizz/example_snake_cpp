@@ -631,31 +631,8 @@ void ConnectionFlow::SavingCompleted(OperationResult r) {
     }
 }
 
-bool ConnectionFlow::EvaluateBridgesSecurity(BridgeList bridges) {
-    bool changed = false;
-    for (auto&& bridge : bridges) {
-        if (bridge->GetIsUsingSsl()) {
-            // if ssl is already enabled, there's nothing to do
-            continue;
-        }
-
-        bool bridge_used_ssl = false;
-        for (auto&& existing_bridge : *_persistentData->GetBridges()) {
-            if (existing_bridge->GetId() == bridge->GetId() && existing_bridge->GetIsUsingSsl()) {
-                bridge_used_ssl = true;
-                break;
-            }
-        }
-
-        if (bridge_used_ssl || bridge->IsSupportingHttps()) {
-            bridge->EnableSsl();
-            if (!bridge_used_ssl) {
-                changed = true;
-            }
-        }
-    }
-
-    return changed;
+bool ConnectionFlow::EvaluateBridgesSecurity(BridgeList /* bridges */) {
+    return false;
 }
 
 void ConnectionFlow::ActivateStreaming() {

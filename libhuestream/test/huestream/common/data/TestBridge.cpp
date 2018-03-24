@@ -414,60 +414,6 @@ TEST_F(TestBridge, ProxyReachability) {
     ASSERT_TRUE(bridge->IsProxyNodeUnreachable());
 }
 
-TEST_F(TestBridge, UseSslHttpAndHttpsPortSet) {
-    bridge->EnableSsl();
-    bridge->SetIpAddress("127.0.0.1");
-    bridge->SetTcpPort("1111");
-    bridge->SetSslPort("2222");
-
-    const std::string urlApiRoot = "https://127.0.0.1:2222/api/";
-    EXPECT_EQ(urlApiRoot, bridge->GetApiRootUrl());
-}
-
-TEST_F(TestBridge, UseSslHttpPortSet) {
-    bridge->EnableSsl();
-    bridge->SetIpAddress("127.0.0.1");
-    bridge->SetTcpPort("1111");
-
-    const std::string urlApiRoot = "https://127.0.0.1/api/";
-    EXPECT_EQ(urlApiRoot, bridge->GetApiRootUrl());
-}
-
-TEST_F(TestBridge, DontUseSslHttpsHttpPortSet) {
-    bridge->SetIpAddress("127.0.0.1");
-    bridge->SetTcpPort("1111");
-    bridge->SetSslPort("2222");
-
-    const std::string urlApiRoot = "http://127.0.0.1:1111/api/";
-    EXPECT_EQ(urlApiRoot, bridge->GetApiRootUrl());
-}
-
-TEST_F(TestBridge, EnableSslProtocolChanges) {
-    bridge->SetIpAddress("127.0.0.1");
-
-    const std::string httpUrlApiRoot = "http://127.0.0.1/api/";
-    const std::string httpsUrlApiRoot = "https://127.0.0.1/api/";
-
-    EXPECT_EQ(httpUrlApiRoot, bridge->GetApiRootUrl());
-
-    bridge->EnableSsl();
-
-    EXPECT_EQ(httpsUrlApiRoot, bridge->GetApiRootUrl());
-}
-
-TEST_F(TestBridge, ChangeApiVersionProtocolDoesntChange) {
-    bridge->SetIpAddress("127.0.0.1");
-
-    const std::string httpUrlApiRoot = "http://127.0.0.1/api/";
-    const std::string httpsUrlApiRoot = "https://127.0.0.1/api/";
-
-    bridge->SetApiversion("1.23.0");
-    EXPECT_EQ(httpUrlApiRoot, bridge->GetApiRootUrl());
-
-    bridge->SetApiversion("1.24.0");
-    EXPECT_NE(httpsUrlApiRoot, bridge->GetApiRootUrl());
-}
-
 /******************************************************************************/
 /*                                 END OF FILE                                */
 /******************************************************************************/
