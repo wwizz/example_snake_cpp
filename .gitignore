@@ -5,3 +5,4 @@
 # Assume the following build directories to ignore
 cmake-*
 build*
+edk/3rd_party/*
