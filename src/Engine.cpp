@@ -1,9 +1,15 @@
+#include <input/InputManagerTerminal.h>
+#include <platform/FrameSpeedManager.h>
+#include <render/Renderer.h>
+#include <huestream/HueStream.h>
 #include "Engine.h"
+#include "GameLogic.h"
 
-Engine::Engine(IInputManager *pInputManager,
+Engine::Engine(InputManagerTerminal *pInputManager,
                FrameSpeedManager *pFrameSpeedManager,
                GameLogic *pGameLogic,
-               Renderer *pRenderer) :
+               Renderer *pRenderer,
+               huestream::HueStreamPtr huestream) :
     _inputManager(pInputManager),
     _frameManager(pFrameSpeedManager),
     _gameLogic(pGameLogic) ,

@@ -8,6 +8,7 @@
 #include <render/IGameRenderer.h>
 #include <platform/Random.h>
 #include <render/Renderer.h>
+#include <input/InputManagerTerminal.h>
 #include "input/IInputManager.h"
 #include "platform/ITerminal.h"
 #include "platform/TimeManager.h"
@@ -20,10 +21,11 @@
 
 class Engine {
  public:
-  Engine(IInputManager *pInputManager,
-         FrameSpeedManager *pFrameSpeedManager,
-         GameLogic *pGameLogic,
-         Renderer *pRenderer);
+  Engine(InputManagerTerminal *pInputManager,
+           FrameSpeedManager *pFrameSpeedManager,
+           GameLogic *pGameLogic,
+           Renderer *pRenderer,
+           huestream::HueStreamPtr huestream);
   void run();
 
  protected:
