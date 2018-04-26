@@ -1,0 +1,44 @@
+{
+    "name": "Philips hue Simulator",
+    "zigbeechannel": 11,
+    "bridgeid": "0017DEADBEEF",
+    "mac": "00:17:DE:ED:BE:EF",
+    "dhcp": true,
+    "ipaddress": "127.0.0.1",
+    "netmask": "255.255.255.0",
+    "gateway": "192.168.1.100",
+    "UTC": "2016-09-28T12:14:29",
+    "localtime": "none",
+    "timezone": "none",
+    "modelid": "BSB002",
+    "swversion": "1706070850",
+    "apiversion": "1.22.0",
+    "swupdate": {
+      "updatestate": 0,
+      "checkforupdate": false,
+      "devicetypes": {
+        "bridge": false,
+        "lights": [],
+        "sensors": []
+      },
+      "url": "",
+      "text": "",
+      "notify": false
+    },
+    "linkbutton": false,
+    "portalservices": false,
+    "portalconnection": "connected",
+    "portalstate": {
+      "signedon": true,
+      "incoming": false,
+      "outgoing": true,
+      "communication": "disconnected",
+      "debug-eventing": "disconnected"
+    },
+    "factorynew": false,
+    "replacesbridgeid": null,
+    "backup": {
+      "status": "idle",
+      "errorcode": 0
+    }
+}

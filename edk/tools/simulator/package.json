@@ -1,0 +1,25 @@
+{
+  "name": "hue-simulator-server",
+  "version": "1.0.0",
+  "description": "Simulates Hue Bridge streaming interface",
+  "main": "server/hueServer.js",
+  "dependencies": {
+    "body-parser": "^1.15.0",
+    "express": "^4.13.4",
+    "request": "^2.69.0",
+    "node-rest-client": "^1.8.0",
+    "socket.io": "^1.7.4",
+    "pixi.js": "^4.5.5",
+    "jquery-ui-dist": "^1.11.4",
+    "jquery": "^3.2.1"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "license": "SEE LICENSE IN ../../HueLicense.txt",
+  "repository" : { 
+    "type" : "git",
+    "url" : "https://github.com/PhilipsHue/EDK.git"
+ }
+}
