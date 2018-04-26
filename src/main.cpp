@@ -9,17 +9,17 @@
 std::shared_ptr<huestream::HueStream> connect_to_hue();
 
 int main() {
+  auto huestream = connect_to_hue();
   auto settings = Settings { 80, 25};
   auto terminal = new TerminalPosix();
   auto timeManager = new TimeManager();
   auto inputManager = new InputManagerTerminal(terminal);
-  auto gameLogic = new GameLogic(timeManager, settings);
+  auto gameLogic = new GameLogic(timeManager, settings, huestream);
   auto frameManager = new FrameSpeedManager(timeManager, 50);
   auto menuRenderer = new MenuRenderderTerminal(terminal, settings.width, settings.height);
   auto gameRenderer = new GameRenderderTerminal(terminal, settings.width, settings.height);
   auto renderer = new Renderer(menuRenderer, gameRenderer);
 
-  auto huestream = connect_to_hue();
 
   Engine(inputManager, frameManager, gameLogic, renderer, huestream).run();
 
@@ -31,6 +31,7 @@ int main() {
   delete inputManager;
   delete timeManager;
   delete terminal;
+  huestream->ShutDown();
 }
 
 std::shared_ptr<huestream::HueStream> connect_to_hue() {

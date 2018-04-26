@@ -1,13 +1,15 @@
+#include <huestream/effect/effects/ExplosionEffect.h>
 #include "GameLogic.h"
 
-GameLogic::GameLogic(TimeManager* timeManager, Settings settings):
+GameLogic::GameLogic(TimeManager *timeManager, Settings settings, huestream::HueStreamPtr huestream) :
 _settings(settings),
 _snake(settings, timeManager),
 _fruit(0 ,0),
 _score(0),
 _random(),
 _menu(),
-_state(GameState_Init){
+_state(GameState_Init),
+_huestream(huestream){
 }
 
 Snake* GameLogic::get_snake() {
@@ -67,6 +69,7 @@ void GameLogic::update_state_menu(const InputCommand &command) {
 
 void GameLogic::start_game() {
   _snake.start();
+  _snake_is_alive = true;
   _score = 0;
   position_fruit();
 }
@@ -88,7 +91,14 @@ void GameLogic::update_state_game(const InputCommand &command) {
     position_fruit();
     _score++;
     _action.needsRender = true;
+    play_eat_light_effect();
   }
+
+  if (!_snake.is_alive() && _snake_is_alive) {
+    _snake_is_alive = false;
+    play_dead_effect();
+  }
+
 }
 
 void GameLogic::position_fruit() {
@@ -105,4 +115,35 @@ void GameLogic::update_state_init() {
 void GameLogic::update_state_shutdown() {
   _action.needsRender = true;
   _action.quit = true;
+}
+void GameLogic::play_eat_light_effect() {
+  // make sure creating of effect is thread save
+  _huestream->LockMixer();
+  auto effect = std::make_shared<huestream::ExplosionEffect>("eat_effect", 1);
+  auto color = huestream::Color(1, 0.8, 0.4);
+  auto radius = 2;
+  auto intensity_expansion_time = 50;
+  auto radius_expansion_time = 106;
+  auto duration = 2000;
+
+  effect->PrepareEffect(color, huestream::Location(0, 0), duration, radius, radius_expansion_time, intensity_expansion_time);
+  _huestream->AddEffect(effect);
+  effect->Enable();
+  _huestream->UnlockMixer();
+
+}
+void GameLogic::play_dead_effect() {
+  _huestream->LockMixer();
+  auto effect = std::make_shared<huestream::ExplosionEffect>("dead_effect", 1);
+  auto color = huestream::Color(1, 0, 0);
+  auto radius = 2;
+  auto intensity_expansion_time = 50;
+  auto radius_expansion_time = 106;
+  auto duration = 5000;
+
+  effect->PrepareEffect(color, huestream::Location(0, 0), duration, radius, radius_expansion_time, intensity_expansion_time);
+  _huestream->AddEffect(effect);
+  effect->Enable();
+  _huestream->UnlockMixer();
+
 }

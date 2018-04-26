@@ -12,7 +12,7 @@ void Snake::start() {
   _body.clear();
   _body.emplace_back(_settings.width / 2, _settings.height / 2);
   _direction = MoveDirection_Right;
-  _moveTimer.start(500);
+  _moveTimer.start(200);
 
 }
 

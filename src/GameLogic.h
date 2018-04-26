@@ -4,6 +4,7 @@
 #include <platform/TimeManager.h>
 #include <platform/Random.h>
 #include <menu/MainMenu.h>
+#include <huestream/HueStream.h>
 #include "Settings.h"
 #include "Snake.h"
 #include "EngineAction.h"
@@ -17,7 +18,7 @@ enum GameState {
 
 class GameLogic {
  public:
-  GameLogic(TimeManager* timeManager, Settings settings);
+  GameLogic(TimeManager *timeManager, Settings settings, huestream::HueStreamPtr huestream);
   Snake* get_snake();
   const Point &get_fruit() const;
   int get_score() const;
@@ -33,6 +34,7 @@ class GameLogic {
   int _score;
   Random _random;
   GameState _state;
+  huestream::HueStreamPtr _huestream;
  public:
   GameState get_state() const;
  protected:
@@ -45,6 +47,9 @@ class GameLogic {
   EngineAction _action;
   void update_state_init();
   void update_state_shutdown();
+  void play_eat_light_effect();
+  bool _snake_is_alive;
+  void play_dead_effect();
 };
 
 #endif //EXAMPLE_SNAKE_CPP_GAMEDATA_H
